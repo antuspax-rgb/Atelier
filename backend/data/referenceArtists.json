@@ -1,0 +1,50 @@
+[
+  {
+    "name": "Feng Zhu",
+    "specialty": ["environment design", "industrial design", "visual development"],
+    "market": "games",
+    "why": "Eccellente per studiare design thinking, chiarezza visiva e pipeline professionale.",
+    "sourceLabel": "FZD School",
+    "sourceUrl": "https://fzdschool.com/alumni_cards"
+  },
+  {
+    "name": "Terryl Whitlatch",
+    "specialty": ["creature design", "anatomy", "visual development"],
+    "market": "film",
+    "why": "Fondamentale per creature credibili, anatomia comparata e funzione biologica.",
+    "sourceLabel": "Creature Design references",
+    "sourceUrl": "https://www.youtube.com/results?search_query=terryl+whitlatch+creature+design"
+  },
+  {
+    "name": "Vitaly Bulgarov",
+    "specialty": ["hard surface", "mecha", "industrial design"],
+    "market": "games/film",
+    "why": "Molto utile per hard-surface, dettagli funzionali e design meccanico credibile.",
+    "sourceLabel": "ArtStation",
+    "sourceUrl": "https://www.artstation.com/vitalybulgarov"
+  },
+  {
+    "name": "Scott Robertson",
+    "specialty": ["perspective", "vehicles", "industrial design"],
+    "market": "games/film",
+    "why": "Riferimento forte per prospettiva, volumi e costruzione chiara nello spazio.",
+    "sourceLabel": "YouTube",
+    "sourceUrl": "https://www.youtube.com/watch?v=T1VQi0mPc5Y"
+  },
+  {
+    "name": "Marco Bucci",
+    "specialty": ["values", "lighting", "composition"],
+    "market": "film/visdev",
+    "why": "Ottimo per allenare gerarchia visiva, luce e chiarezza pittorica.",
+    "sourceLabel": "YouTube",
+    "sourceUrl": "https://www.youtube.com/@marcobucci"
+  },
+  {
+    "name": "Jama Jurabaev",
+    "specialty": ["cinematic environment", "workflow", "blockout"],
+    "market": "film",
+    "why": "Molto utile per capire workflow veloci, 3D support e visual development cinematografico.",
+    "sourceLabel": "Artist channels",
+    "sourceUrl": "https://www.youtube.com/results?search_query=jama+jurabaev+concept+art"
+  }
+]
