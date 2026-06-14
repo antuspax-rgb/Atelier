@@ -76,7 +76,11 @@ export default function App() {
   const [curriculum, setCurriculum] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [filePreviews, setFilePreviews] = useState([]);
+  const [chatFiles, setChatFiles] = useState([]);
+  const [chatFilePreviews, setChatFilePreviews] = useState([]);
   const fileInputRef = useRef(null);
+  const chatFileInputRef = useRef(null);
+
 
   useEffect(() => {
     saveState(state);
@@ -133,10 +137,17 @@ export default function App() {
   }, [state.focusMode.running]);
 
   useEffect(() => {
-    return () => {
-      filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-    };
-  }, [filePreviews]);
+  return () => {
+    filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+  };
+}, [filePreviews]);
+
+useEffect(() => {
+  return () => {
+    chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+  };
+}, [chatFilePreviews]);
+
 
   async function createExercise(type) {
     setBusy((prev) => ({ ...prev, exercise: true }));
@@ -197,6 +208,37 @@ export default function App() {
       return prev.filter((_, index) => index !== indexToRemove);
     });
   }
+
+  function handleChatFileChange(event) {
+  const files = Array.from(event.target.files || []).filter((file) =>
+    file.type.startsWith('image/')
+  );
+
+  chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+  setChatFiles(files);
+
+  const previews = files.map((file) => ({
+    name: file.name,
+    url: URL.createObjectURL(file),
+    size: file.size
+  }));
+
+  setChatFilePreviews(previews);
+}
+
+function openChatFilePicker() {
+  chatFileInputRef.current?.click();
+}
+
+function removeChatFile(indexToRemove) {
+  setChatFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+  setChatFilePreviews((prev) => {
+    const removed = prev[indexToRemove];
+    if (removed?.url) URL.revokeObjectURL(removed.url);
+    return prev.filter((_, index) => index !== indexToRemove);
+  });
+}
+
 
   async function analyzeWork() {
     if (!state.currentExercise) return;
@@ -288,6 +330,11 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userMessage,
+          files: chatFiles.map((file) => ({
+            name: file.name,
+            type: file.type,
+            size: file.size
+          })),
           context: {
             goal,
             level: profile.level,
@@ -308,19 +355,25 @@ export default function App() {
         })
       });
 
-      const data = await res.json();
+     const data = await res.json();
 
-      setState((prev) => ({
-        ...prev,
-        mentorMessages: [
-          ...prev.mentorMessages,
-          { role: 'assistant', content: data.reply }
-        ]
-      }));
-    } finally {
-      setBusy((prev) => ({ ...prev, chat: false }));
-    }
-  }
+setState((prev) => ({
+  ...prev,
+  mentorMessages: [
+    ...prev.mentorMessages,
+    { role: 'assistant', content: data.reply }
+  ]
+}));
+
+setChatInput('');
+chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+setChatFiles([]);
+setChatFilePreviews([]);
+
+} finally {
+  setBusy((prev) => ({ ...prev, chat: false }));
+}
+ 
 
   function toggleFocus() {
     setState((prev) => ({
@@ -352,6 +405,12 @@ export default function App() {
     chatInput,
     setChatInput,
     onSendMessage: sendMessage,
+    chatFiles,
+    chatFilePreviews,
+    onChatFileChange: handleChatFileChange,
+    onOpenChatFilePicker: openChatFilePicker,
+    onRemoveChatFile: removeChatFile,
+    chatFileInputRef,
     onCreateExercise: createExercise,
     onAnalyzeWork: analyzeWork,
     uploadedFiles,
@@ -390,4 +449,5 @@ export default function App() {
       <MobileNav active={screen} onNavigate={setScreen} />
     </div>
   );
-}
+  }
+} 

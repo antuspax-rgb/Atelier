@@ -799,7 +799,7 @@ Fai feedback tecnico da mentor di concept art.
 });
 
 app.post("/api/mentor-chat", async (req, res) => {
-  const { message, context = {} } = req.body || {};
+  const { message, images = [], context = {} } = req.body || {};
 
   if (!message || !String(message).trim()) {
     return res.status(400).json({ error: "Campo obbligatorio: message" });
@@ -813,12 +813,18 @@ ${buildStudentContextBlock(context)}
 Messaggio utente:
 ${String(message).trim()}
 
+Se sono presenti immagini, trattale come materiale visivo da analizzare o commentare.
+Possono essere sketch, concept, studi di silhouette, anatomy study, sculpt screenshot, blockout o design work.
+Se l'immagine è poco leggibile, dichiaralo con chiarezza e chiedi un'inquadratura o un'immagine migliore.
 Rispondi come il Mentor di Atelier, in italiano.
 `;
 
   try {
     const system = buildMentorChatSystem(streak);
-    const data = await callClaudeText(SONNET, system, userPrompt);
+    const data = images.length
+      ? await callClaude(SONNET, system, userPrompt, images)
+      : await callClaudeText(SONNET, system, userPrompt);
+
     res.json(normalizeChatReply(data));
   } catch (err) {
     console.error("[mentor-chat]", err.message);
