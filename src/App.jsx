@@ -81,7 +81,6 @@ export default function App() {
   const fileInputRef = useRef(null);
   const chatFileInputRef = useRef(null);
 
-
   useEffect(() => {
     saveState(state);
   }, [state]);
@@ -137,17 +136,16 @@ export default function App() {
   }, [state.focusMode.running]);
 
   useEffect(() => {
-  return () => {
-    filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-  };
-}, [filePreviews]);
+    return () => {
+      filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+    };
+  }, [filePreviews]);
 
-useEffect(() => {
-  return () => {
-    chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-  };
-}, [chatFilePreviews]);
-
+  useEffect(() => {
+    return () => {
+      chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+    };
+  }, [chatFilePreviews]);
 
   async function createExercise(type) {
     setBusy((prev) => ({ ...prev, exercise: true }));
@@ -188,11 +186,13 @@ useEffect(() => {
     const files = Array.from(event.target.files || []);
     filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
     setUploadedFiles(files);
+
     const previews = files.map((file) => ({
       name: file.name,
       url: URL.createObjectURL(file),
       size: file.size
     }));
+
     setFilePreviews(previews);
   }
 
@@ -210,35 +210,34 @@ useEffect(() => {
   }
 
   function handleChatFileChange(event) {
-  const files = Array.from(event.target.files || []).filter((file) =>
-    file.type.startsWith('image/')
-  );
+    const files = Array.from(event.target.files || []).filter((file) =>
+      file.type.startsWith('image/')
+    );
 
-  chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-  setChatFiles(files);
+    chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+    setChatFiles(files);
 
-  const previews = files.map((file) => ({
-    name: file.name,
-    url: URL.createObjectURL(file),
-    size: file.size
-  }));
+    const previews = files.map((file) => ({
+      name: file.name,
+      url: URL.createObjectURL(file),
+      size: file.size
+    }));
 
-  setChatFilePreviews(previews);
-}
+    setChatFilePreviews(previews);
+  }
 
-function openChatFilePicker() {
-  chatFileInputRef.current?.click();
-}
+  function openChatFilePicker() {
+    chatFileInputRef.current?.click();
+  }
 
-function removeChatFile(indexToRemove) {
-  setChatFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
-  setChatFilePreviews((prev) => {
-    const removed = prev[indexToRemove];
-    if (removed?.url) URL.revokeObjectURL(removed.url);
-    return prev.filter((_, index) => index !== indexToRemove);
-  });
-}
-
+  function removeChatFile(indexToRemove) {
+    setChatFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
+    setChatFilePreviews((prev) => {
+      const removed = prev[indexToRemove];
+      if (removed?.url) URL.revokeObjectURL(removed.url);
+      return prev.filter((_, index) => index !== indexToRemove);
+    });
+  }
 
   async function analyzeWork() {
     if (!state.currentExercise) return;
@@ -355,32 +354,31 @@ function removeChatFile(indexToRemove) {
         })
       });
 
-     const data = await res.json();
+      const data = await res.json();
 
-setState((prev) => ({
-  ...prev,
-  mentorMessages: [
-    ...prev.mentorMessages,
-    { role: 'assistant', content: data.reply }
-  ]
-}));
+      setState((prev) => ({
+        ...prev,
+        mentorMessages: [
+          ...prev.mentorMessages,
+          { role: 'assistant', content: data.reply }
+        ]
+      }));
 
-setChatInput('');
-chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-setChatFiles([]);
-setChatFilePreviews([]);
+      setChatInput('');
+      chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+      setChatFiles([]);
+      setChatFilePreviews([]);
+    } finally {
+      setBusy((prev) => ({ ...prev, chat: false }));
+    }
+  }
 
-} finally {
-  setBusy((prev) => ({ ...prev, chat: false }));
-}
-}
-
-function toggleFocus() {
-  setState((prev) => ({
-    ...prev,
-    focusMode: { ...prev.focusMode, running: !prev.focusMode.running }
-  }));
-}
+  function toggleFocus() {
+    setState((prev) => ({
+      ...prev,
+      focusMode: { ...prev.focusMode, running: !prev.focusMode.running }
+    }));
+  }
 
   function resetFocus() {
     setState((prev) => ({
@@ -449,5 +447,4 @@ function toggleFocus() {
       <MobileNav active={screen} onNavigate={setScreen} />
     </div>
   );
-  }
-} 
+}
