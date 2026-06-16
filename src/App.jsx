@@ -312,7 +312,7 @@ function removeChatFile(indexToRemove) {
 
   async function sendMessage(e) {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    if (!chatInput.trim() && chatFiles.length === 0) return;
 
     const userMessage = chatInput.trim();
     setChatInput('');
@@ -373,14 +373,14 @@ setChatFilePreviews([]);
 } finally {
   setBusy((prev) => ({ ...prev, chat: false }));
 }
- 
+}
 
-  function toggleFocus() {
-    setState((prev) => ({
-      ...prev,
-      focusMode: { ...prev.focusMode, running: !prev.focusMode.running }
-    }));
-  }
+function toggleFocus() {
+  setState((prev) => ({
+    ...prev,
+    focusMode: { ...prev.focusMode, running: !prev.focusMode.running }
+  }));
+}
 
   function resetFocus() {
     setState((prev) => ({

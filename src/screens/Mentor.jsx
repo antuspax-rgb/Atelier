@@ -1,6 +1,17 @@
 import { useEffect, useRef } from 'react';
 
-export default function Mentor({ state, chatInput, setChatInput, onSendMessage, busy }) {
+export default function Mentor({
+  state,
+  chatInput,
+  setChatInput,
+  onSendMessage,
+  busy,
+  chatFilePreviews,
+  onChatFileChange,
+  onOpenChatFilePicker,
+  onRemoveChatFile,
+  chatFileInputRef
+}) {
   const logRef = useRef(null);
 
   useEffect(() => {
