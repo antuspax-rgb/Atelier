@@ -13,12 +13,12 @@ const anthropic = new Anthropic({
 
 const allowedOrigins = [
   process.env.FRONTEND_ORIGIN,
-  'http://localhost:5173',
-  'http://localhost:5174',
-  'capacitor://localhost',
-  'http://localhost',
-  'https://localhost'
-].filter(Boolean)
+  "http://localhost:5173",
+  "http://localhost:5174",
+  "capacitor://localhost",
+  "http://localhost",
+  "https://localhost"
+].filter(Boolean);
 
 app.use(
   cors({
@@ -527,7 +527,7 @@ La tua empatia deve essere misurata:
 Rispondi ESCLUSIVAMENTE con JSON valido:
 
 {
-"reply": "risposta del mentor in italiano, chiara, concreta, tecnica quando serve, sobria ma più umana ed empatica"
+  "reply": "risposta del mentor in italiano, chiara, concreta, tecnica quando serve, sobria ma più umana ed empatica"
 }
 `;
 }
@@ -608,8 +608,17 @@ async function callClaudeText(model, system, userText) {
     messages: [{ role: "user", content: [{ type: "text", text: userText }] }]
   });
 
-  const raw = msg.content.map((b) => b.text || "").join("");
-  return parseModelJSON(raw);
+  const raw = msg.content.map((b) => b.text || "").join("").trim();
+
+  try {
+    return parseModelJSON(raw);
+  } catch (err) {
+    console.warn("[callClaudeText] JSON parse fallito, uso fallback testuale:", err.message);
+    return {
+      reply:
+        raw || "Va bene. Riformula la richiesta in modo più specifico e ti aiuto."
+    };
+  }
 }
 
 function clampScore(value) {

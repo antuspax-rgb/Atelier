@@ -86,7 +86,9 @@ export default function App() {
   }, [state]);
 
   useEffect(() => {
-    fetch(`${API_BASE}/health`).then((r) => r.json()).catch(() => {});
+    fetch(`${API_BASE}/health`)
+      .then((r) => r.json())
+      .catch(() => {});
 
     fetch(`${API_BASE}/student-memory`)
       .then((r) => r.json())
@@ -314,11 +316,19 @@ export default function App() {
     if (!chatInput.trim() && chatFiles.length === 0) return;
 
     const userMessage = chatInput.trim();
+    const images = await Promise.all(chatFiles.map(fileToBase64));
+
     setChatInput('');
 
     setState((prev) => ({
       ...prev,
-      mentorMessages: [...prev.mentorMessages, { role: 'user', content: userMessage }]
+      mentorMessages: [
+        ...prev.mentorMessages,
+        {
+          role: 'user',
+          content: userMessage || 'Ho allegato delle immagini.'
+        }
+      ]
     }));
 
     setBusy((prev) => ({ ...prev, chat: true }));
@@ -328,12 +338,8 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage,
-          files: chatFiles.map((file) => ({
-            name: file.name,
-            type: file.type,
-            size: file.size
-          })),
+          message: userMessage || 'Analizza queste immagini e dammi feedback tecnico.',
+          images,
           context: {
             goal,
             level: profile.level,
@@ -364,10 +370,10 @@ export default function App() {
         ]
       }));
 
-      setChatInput('');
       chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
       setChatFiles([]);
       setChatFilePreviews([]);
+      if (chatFileInputRef.current) chatFileInputRef.current.value = '';
     } finally {
       setBusy((prev) => ({ ...prev, chat: false }));
     }
