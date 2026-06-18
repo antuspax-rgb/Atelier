@@ -8,7 +8,15 @@ const NAV = [
 
 function Icon({ d }) {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d={d} />
     </svg>
   );
@@ -43,7 +51,7 @@ export default function Sidebar({ active, onNavigate, focusMode, secondsToClock 
       <div className={`focus-pill ${focusMode.running ? 'is-running' : ''}`}>
         <div className="focus-pill-row">
           <span className="focus-dot" />
-          <span className="focus-label">Focus</span>
+          <span className="focus-label">{focusMode.running ? 'Focus attivo' : 'Focus'}</span>
           <span className="focus-clock">{secondsToClock(focusMode.secondsLeft)}</span>
         </div>
       </div>
