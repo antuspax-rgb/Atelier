@@ -1,24 +1,13 @@
 import { useEffect, useRef } from 'react';
 
-export default function Mentor({
-  state,
-  chatInput,
-  setChatInput,
-  onSendMessage,
-  busy,
-  chatFilePreviews,
-  onChatFileChange,
-  onOpenChatFilePicker,
-  onRemoveChatFile,
-  chatFileInputRef
-}) {
+export default function Mentor({ state, chatInput, setChatInput, onSendMessage, busy }) {
   const logRef = useRef(null);
 
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [state.mentorMessages, busy.chat]);
+  }, [state.mentorMessages, busy]);
 
   function onKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -36,92 +25,43 @@ export default function Mentor({
         </div>
       </header>
 
-      <div className="chat" ref={logRef}>
-        {state.mentorMessages.map((msg, idx) => (
-          <article key={idx} className={`msg msg-${msg.role}`}>
-            <span className="msg-role">
-              {msg.role === 'assistant' ? 'Mentor' : 'Tu'}
-            </span>
-            <p>{msg.content}</p>
-          </article>
-        ))}
+      <div className="chat-shell card">
+        <div className="chat" ref={logRef}>
+          {state.mentorMessages.map((msg, idx) => (
+            <article key={idx} className={`msg msg-${msg.role}`}>
+              <span className="msg-role">{msg.role === 'assistant' ? 'Mentor' : 'Tu'}</span>
+              <p>{msg.content}</p>
+            </article>
+          ))}
 
-        {busy.chat ? (
-          <article className="msg msg-assistant msg-typing">
-            <span className="msg-role">Mentor</span>
-            <p>
-              <span className="dot" />
-              <span className="dot" />
-              <span className="dot" />
-            </p>
-          </article>
-        ) : null}
-      </div>
-
-      <form className="composer" onSubmit={onSendMessage}>
-        <input
-          ref={chatFileInputRef}
-          type="file"
-          accept="image/*"
-          multiple
-          hidden
-          onChange={onChatFileChange}
-        />
-
-        {chatFilePreviews.length > 0 && (
-          <div className="upload-preview-list compact">
-            {chatFilePreviews.map((file, index) => (
-              <article
-                key={`${file.name}-${index}`}
-                className="upload-preview-item compact"
-              >
-                <img
-                  src={file.url}
-                  alt={file.name}
-                  className="upload-preview-thumb compact"
-                />
-                <div className="upload-preview-meta">
-                  <strong>{file.name}</strong>
-                  <span>{Math.round(file.size / 1024)} KB</span>
-                </div>
-                <button
-                  type="button"
-                  className="ghost"
-                  onClick={() => onRemoveChatFile(index)}
-                >
-                  Rimuovi
-                </button>
-              </article>
-            ))}
-          </div>
-        )}
-
-        <textarea
-          value={chatInput}
-          onChange={(e) => setChatInput(e.target.value)}
-          onKeyDown={onKeyDown}
-          rows={2}
-          placeholder="Chiedi un drill, una correzione o come studiare un artista."
-        />
-
-        <div className="chat-actions">
-          <button
-            type="button"
-            className="btn ghost"
-            onClick={onOpenChatFilePicker}
-            disabled={busy.chat}
-          >
-            Allega immagini
-          </button>
-
-          <button
-            className="btn primary"
-            disabled={busy.chat || (!chatInput.trim() && chatFilePreviews.length === 0)}
-          >
-            Invia
-          </button>
+          {busy.chat ? (
+            <article className="msg msg-assistant msg-typing">
+              <span className="msg-role">Mentor</span>
+              <p>
+                <span className="dot" />
+                <span className="dot" />
+                <span className="dot" />
+              </p>
+            </article>
+          ) : null}
         </div>
-      </form>
+
+        <form className="composer" onSubmit={onSendMessage}>
+          <textarea
+            value={chatInput}
+            onChange={(e) => setChatInput(e.target.value)}
+            onKeyDown={onKeyDown}
+            rows={2}
+            placeholder="Chiedi un drill, una correzione o come studiare un artista."
+          />
+
+          <div className="chat-actions">
+            <button className="btn primary" disabled={busy.chat || !chatInput.trim()}>
+              Invia
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
