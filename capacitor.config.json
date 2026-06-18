@@ -1,5 +1,8 @@
 {
   "appId": "com.antuspax.atelier",
   "appName": "Atelier",
-  "webDir": "dist"
+  "webDir": "dist",
+  "ios": {
+    "contentInset": "always"
+  }
 }
