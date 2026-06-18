@@ -132,9 +132,9 @@ a:hover {
   display: flex;
   justify-content: center;
   padding:
-    calc(26px + var(--safe-top))
+    calc(30px + var(--safe-top))
     clamp(20px, 4vw, 56px)
-    calc(40px + var(--safe-bottom))
+    calc(44px + var(--safe-bottom))
     clamp(20px, 4vw, 56px);
 }
 
@@ -793,7 +793,7 @@ textarea:focus {
 
 .screen-chat {
   min-height: 0;
-  height: calc(100dvh - 40px - var(--safe-top) - var(--safe-bottom));
+  height: calc(100dvh - 52px - var(--safe-top) - var(--safe-bottom));
   display: flex;
   flex-direction: column;
 }
@@ -971,9 +971,9 @@ textarea:focus {
   position: fixed;
   left: calc(14px + var(--safe-left));
   right: calc(14px + var(--safe-right));
-  bottom: calc(10px + var(--safe-bottom));
+  bottom: calc(22px + var(--safe-bottom));
   padding: 8px;
-  background: rgba(16, 20, 27, 0.9);
+  background: rgba(16, 20, 27, 0.92);
   backdrop-filter: blur(18px);
   -webkit-backdrop-filter: blur(18px);
   border: 1px solid var(--line-strong);
@@ -1018,9 +1018,9 @@ textarea:focus {
 
   .content {
     padding:
-      calc(16px + var(--safe-top))
+      max(28px, calc(28px + var(--safe-top)))
       16px
-      calc(94px + var(--safe-bottom))
+      max(138px, calc(118px + var(--safe-bottom)))
       16px;
   }
 
@@ -1031,6 +1031,7 @@ textarea:focus {
   .screen-head {
     align-items: flex-start;
     flex-direction: column;
+    gap: 10px;
   }
 
   .screen-head .btn {
@@ -1070,7 +1071,7 @@ textarea:focus {
   }
 
   .screen-chat {
-    height: calc(100dvh - 110px - var(--safe-top) - var(--safe-bottom));
+    height: calc(100dvh - 150px - var(--safe-top) - var(--safe-bottom));
   }
 
   .msg {
@@ -1099,19 +1100,27 @@ textarea:focus {
 
 @media (max-width: 520px) {
   h1 {
-    font-size: 1.7rem;
+    font-size: 1.68rem;
   }
 
   .content {
     padding:
-      calc(14px + var(--safe-top))
+      max(34px, calc(34px + var(--safe-top)))
       14px
-      calc(96px + var(--safe-bottom))
+      max(144px, calc(124px + var(--safe-bottom)))
       14px;
   }
 
   .screen {
     gap: 16px;
+  }
+
+  .screen-head {
+    margin-bottom: 4px;
+  }
+
+  .eyebrow {
+    margin-bottom: 10px;
   }
 
   .card,
@@ -1130,6 +1139,12 @@ textarea:focus {
 
   .chat-actions .btn {
     width: 100%;
+  }
+
+  .mobile-nav {
+    left: calc(12px + var(--safe-left));
+    right: calc(12px + var(--safe-right));
+    bottom: calc(24px + var(--safe-bottom));
   }
 
   .mobile-nav-item {
