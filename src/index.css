@@ -40,7 +40,7 @@
   --safe-left: env(safe-area-inset-left, 0px);
 
   --safe-top-space: max(18px, var(--safe-top));
-  --safe-bottom-space: max(18px, var(--safe-bottom));
+  --safe-bottom-space: max(8px, var(--safe-bottom));
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -1029,8 +1029,8 @@ textarea:focus {
   }
 
   .content {
-  padding: 12px 16px calc(110px + var(--safe-bottom-space));
-}
+    padding: 12px 16px calc(86px + var(--safe-bottom));
+  }
 
   .screen {
     gap: 18px;
@@ -1112,8 +1112,8 @@ textarea:focus {
   }
 
   .content {
-  padding: 12px 14px calc(90px + var(--safe-bottom));
-}
+    padding: 12px 14px calc(90px + var(--safe-bottom));
+  }
 
   .screen {
     gap: 16px;
