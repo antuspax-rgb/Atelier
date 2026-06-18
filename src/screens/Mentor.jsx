@@ -1,13 +1,25 @@
 import { useEffect, useRef } from 'react';
 
-export default function Mentor({ state, chatInput, setChatInput, onSendMessage, busy }) {
+export default function Mentor({
+  state,
+  chatInput,
+  setChatInput,
+  onSendMessage,
+  busy,
+  uploadedFiles,
+  filePreviews,
+  onFileChange,
+  onOpenFilePicker,
+  fileInputRef,
+  onRemoveFile
+}) {
   const logRef = useRef(null);
 
   useEffect(() => {
     if (logRef.current) {
       logRef.current.scrollTop = logRef.current.scrollHeight;
     }
-  }, [state.mentorMessages, busy]);
+  }, [state.mentorMessages, busy, filePreviews]);
 
   function onKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -47,6 +59,44 @@ export default function Mentor({ state, chatInput, setChatInput, onSendMessage, 
         </div>
 
         <form className="composer" onSubmit={onSendMessage}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            multiple
+            onChange={onFileChange}
+            style={{ display: 'none' }}
+          />
+
+          {filePreviews?.length ? (
+            <div className="upload-preview-list compact">
+              {filePreviews.map((file, index) => (
+                <div key={`${file.name}-${index}`} className="upload-preview-item compact">
+                  <img
+                    src={file.url}
+                    alt={file.name}
+                    className="upload-preview-thumb compact"
+                  />
+
+                  <div className="upload-preview-meta">
+                    <strong>{file.name}</strong>
+                    <span>
+                      {Math.max(1, Math.round((uploadedFiles?.[index]?.size || file.size || 0) / 1024))} KB
+                    </span>
+                  </div>
+
+                  <button
+                    type="button"
+                    className="btn ghost"
+                    onClick={() => onRemoveFile(index)}
+                  >
+                    Rimuovi
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : null}
+
           <textarea
             value={chatInput}
             onChange={(e) => setChatInput(e.target.value)}
@@ -56,7 +106,19 @@ export default function Mentor({ state, chatInput, setChatInput, onSendMessage, 
           />
 
           <div className="chat-actions">
-            <button className="btn primary" disabled={busy.chat || !chatInput.trim()}>
+            <button
+              type="button"
+              className="btn ghost"
+              onClick={onOpenFilePicker}
+            >
+              Aggiungi immagini
+            </button>
+
+            <button
+              type="submit"
+              className="btn primary"
+              disabled={busy.chat || !chatInput.trim()}
+            >
               Invia
             </button>
           </div>
