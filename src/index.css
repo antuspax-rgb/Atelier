@@ -983,7 +983,7 @@ textarea:focus {
   position: fixed;
   left: 12px;
   right: 12px;
-  bottom: calc(var(--safe-bottom-space) + 10px);
+  bottom: calc(var(--safe-bottom) + 4px);
   padding: 8px;
   background: rgba(16, 20, 27, 0.92);
   backdrop-filter: blur(18px);
@@ -1029,8 +1029,8 @@ textarea:focus {
   }
 
   .content {
-    padding: 12px 16px calc(110px + var(--safe-bottom-space));
-  }
+  padding: 12px 16px calc(110px + var(--safe-bottom-space));
+}
 
   .screen {
     gap: 18px;
@@ -1112,8 +1112,8 @@ textarea:focus {
   }
 
   .content {
-    padding: 12px 14px calc(116px + var(--safe-bottom-space));
-  }
+  padding: 12px 14px calc(90px + var(--safe-bottom));
+}
 
   .screen {
     gap: 16px;
