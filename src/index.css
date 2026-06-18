@@ -39,6 +39,9 @@
   --safe-bottom: env(safe-area-inset-bottom, 0px);
   --safe-left: env(safe-area-inset-left, 0px);
 
+  --safe-top-space: max(18px, var(--safe-top));
+  --safe-bottom-space: max(18px, var(--safe-bottom));
+
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -54,6 +57,11 @@ body,
 
 html {
   background: var(--bg-0);
+  padding:
+    var(--safe-top)
+    var(--safe-right)
+    var(--safe-bottom)
+    var(--safe-left);
 }
 
 body {
@@ -67,6 +75,7 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
   font-feature-settings: 'ss01', 'cv11';
+  min-height: calc(100% + var(--safe-top));
 }
 
 img {
@@ -131,11 +140,7 @@ a:hover {
   min-width: 0;
   display: flex;
   justify-content: center;
-  padding:
-    calc(30px + var(--safe-top))
-    clamp(20px, 4vw, 56px)
-    calc(44px + var(--safe-bottom))
-    clamp(20px, 4vw, 56px);
+  padding: 30px clamp(20px, 4vw, 56px) 44px;
 }
 
 .screen {
@@ -204,9 +209,9 @@ a:hover {
   position: sticky;
   top: 0;
   align-self: start;
-  height: 100vh;
-  height: 100dvh;
-  padding: calc(20px + var(--safe-top)) 18px calc(20px + var(--safe-bottom));
+  height: calc(100vh - var(--safe-top) - var(--safe-bottom));
+  height: calc(100dvh - var(--safe-top) - var(--safe-bottom));
+  padding: 20px 18px 20px;
   background: rgba(16, 20, 27, 0.88);
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
@@ -976,9 +981,9 @@ textarea:focus {
 .mobile-nav {
   display: none;
   position: fixed;
-  left: calc(12px + var(--safe-left));
-  right: calc(12px + var(--safe-right));
-  bottom: calc(24px + var(--safe-bottom));
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--safe-bottom-space) + 10px);
   padding: 8px;
   background: rgba(16, 20, 27, 0.92);
   backdrop-filter: blur(18px);
@@ -1024,11 +1029,7 @@ textarea:focus {
   }
 
   .content {
-    padding:
-      max(12px, calc(12px + var(--safe-top)))
-      16px
-      max(138px, calc(118px + var(--safe-bottom)))
-      16px;
+    padding: 12px 16px calc(110px + var(--safe-bottom-space));
   }
 
   .screen {
@@ -1078,7 +1079,7 @@ textarea:focus {
   }
 
   .chat-shell {
-    min-height: calc(100dvh - 240px - var(--safe-top) - var(--safe-bottom));
+    min-height: calc(100dvh - 240px - var(--safe-top-space) - var(--safe-bottom-space));
   }
 
   .msg {
@@ -1111,11 +1112,7 @@ textarea:focus {
   }
 
   .content {
-    padding:
-      max(16px, calc(16px + var(--safe-top)))
-      14px
-      max(144px, calc(124px + var(--safe-bottom)))
-      14px;
+    padding: 12px 14px calc(116px + var(--safe-bottom-space));
   }
 
   .screen {
@@ -1141,7 +1138,7 @@ textarea:focus {
   }
 
   .chat-shell {
-    min-height: calc(100dvh - 228px - var(--safe-top) - var(--safe-bottom));
+    min-height: calc(100dvh - 228px - var(--safe-top-space) - var(--safe-bottom-space));
   }
 
   .chat-actions {
