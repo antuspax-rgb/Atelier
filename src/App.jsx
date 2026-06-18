@@ -30,7 +30,11 @@ const defaultState = {
     running: false,
     secondsLeft: 25 * 60,
     duration: 25 * 60,
-    blockedApps: ['Instagram', 'TikTok', 'YouTube', 'X', 'Discord']
+    blockedApps: ['Instagram', 'TikTok', 'YouTube', 'X', 'Discord'],
+    elapsedSecondsToday: 0,
+    totalElapsedSeconds: 0,
+    lastTickAt: null,
+    lastStudiedOn: null
   }
 };
 
@@ -55,9 +59,31 @@ function fileToBase64(file) {
   });
 }
 
+function todayKey() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function isYesterday(dateString) {
+  if (!dateString) return false;
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().slice(0, 10) === dateString;
+}
+
+function withFocusDefaults(stateLike) {
+  const baseFocus = defaultState.focusMode;
+  return {
+    ...stateLike,
+    focusMode: {
+      ...baseFocus,
+      ...(stateLike?.focusMode || {})
+    }
+  };
+}
+
 export default function App() {
   const saved = useMemo(() => loadState(), []);
-  const [state, setState] = useState(saved || defaultState);
+  const [state, setState] = useState(withFocusDefaults(saved || defaultState));
   const [screen, setScreen] = useState('dashboard');
   const [chatInput, setChatInput] = useState('');
   const [goal, setGoal] = useState(
@@ -76,10 +102,7 @@ export default function App() {
   const [curriculum, setCurriculum] = useState(null);
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [filePreviews, setFilePreviews] = useState([]);
-  const [chatFiles, setChatFiles] = useState([]);
-  const [chatFilePreviews, setChatFilePreviews] = useState([]);
   const fileInputRef = useRef(null);
-  const chatFileInputRef = useRef(null);
 
   useEffect(() => {
     saveState(state);
@@ -100,36 +123,77 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    const interval = setInterval(() => {
+      const today = todayKey();
+
+      setState((prev) => {
+        if (prev.focusMode.lastStudiedOn && prev.focusMode.lastStudiedOn !== today) {
+          return {
+            ...prev,
+            dailyMinutes: 0,
+            focusMode: {
+              ...prev.focusMode,
+              elapsedSecondsToday: 0
+            }
+          };
+        }
+        return prev;
+      });
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  useEffect(() => {
     if (!state.focusMode.running) return;
 
     const timer = setInterval(() => {
       setState((prev) => {
-        const next = Math.max(prev.focusMode.secondsLeft - 1, 0);
-        const done = next === 0;
+        const nowDay = todayKey();
+        const prevLastStudiedOn = prev.focusMode.lastStudiedOn;
+        const nextSecondsLeft = Math.max(prev.focusMode.secondsLeft - 1, 0);
+        const completed = nextSecondsLeft === 0;
+
+        let nextStreak = prev.streak;
+        if (prevLastStudiedOn !== nowDay) {
+          if (isYesterday(prevLastStudiedOn)) {
+            nextStreak = prev.streak + 1;
+          } else if (!prevLastStudiedOn) {
+            nextStreak = Math.max(prev.streak, 1);
+          } else {
+            nextStreak = 1;
+          }
+        }
+
+        const elapsedSecondsToday = (prev.focusMode.elapsedSecondsToday || 0) + 1;
+        const totalElapsedSeconds = (prev.focusMode.totalElapsedSeconds || 0) + 1;
+
+        const nextRecentSessions = completed
+          ? [
+              {
+                type: 'Focus session',
+                when: new Date().toLocaleString('it-IT'),
+                minutes: Math.round(prev.focusMode.duration / 60)
+              },
+              ...prev.recentSessions
+            ].slice(0, 12)
+          : prev.recentSessions;
 
         return {
           ...prev,
+          streak: nextStreak,
+          dailyMinutes: Math.floor(elapsedSecondsToday / 60),
+          totalHours: Number((totalElapsedSeconds / 3600).toFixed(1)),
+          recentSessions: nextRecentSessions,
           focusMode: {
             ...prev.focusMode,
-            secondsLeft: done ? prev.focusMode.duration : next,
-            running: done ? false : true
-          },
-          streak: done ? prev.streak + 1 : prev.streak,
-          dailyMinutes: done
-            ? prev.dailyMinutes + Math.round(prev.focusMode.duration / 60)
-            : prev.dailyMinutes,
-          totalHours: done
-            ? Number((prev.totalHours + prev.focusMode.duration / 3600).toFixed(1))
-            : prev.totalHours,
-          recentSessions: done
-            ? [
-                {
-                  type: 'Focus session',
-                  when: new Date().toLocaleString('it-IT')
-                },
-                ...prev.recentSessions
-              ].slice(0, 6)
-            : prev.recentSessions
+            running: completed ? false : true,
+            secondsLeft: completed ? prev.focusMode.duration : nextSecondsLeft,
+            elapsedSecondsToday,
+            totalElapsedSeconds,
+            lastTickAt: Date.now(),
+            lastStudiedOn: nowDay
+          }
         };
       });
     }, 1000);
@@ -143,15 +207,8 @@ export default function App() {
     };
   }, [filePreviews]);
 
-  useEffect(() => {
-    return () => {
-      chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-    };
-  }, [chatFilePreviews]);
-
   async function createExercise(type) {
     setBusy((prev) => ({ ...prev, exercise: true }));
-
     try {
       const res = await fetch(`${API_BASE}/generate-exercise`, {
         method: 'POST',
@@ -211,38 +268,9 @@ export default function App() {
     });
   }
 
-  function handleChatFileChange(event) {
-    const files = Array.from(event.target.files || []).filter((file) =>
-      file.type.startsWith('image/')
-    );
-
-    chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-    setChatFiles(files);
-
-    const previews = files.map((file) => ({
-      name: file.name,
-      url: URL.createObjectURL(file),
-      size: file.size
-    }));
-
-    setChatFilePreviews(previews);
-  }
-
-  function openChatFilePicker() {
-    chatFileInputRef.current?.click();
-  }
-
-  function removeChatFile(indexToRemove) {
-    setChatFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
-    setChatFilePreviews((prev) => {
-      const removed = prev[indexToRemove];
-      if (removed?.url) URL.revokeObjectURL(removed.url);
-      return prev.filter((_, index) => index !== indexToRemove);
-    });
-  }
-
   async function analyzeWork() {
     if (!state.currentExercise) return;
+
     if (!uploadedFiles.length) {
       alert('Carica almeno un elaborato prima di avviare l’analisi.');
       return;
@@ -313,22 +341,14 @@ export default function App() {
 
   async function sendMessage(e) {
     e.preventDefault();
-    if (!chatInput.trim() && chatFiles.length === 0) return;
+    if (!chatInput.trim()) return;
 
     const userMessage = chatInput.trim();
-    const images = await Promise.all(chatFiles.map(fileToBase64));
-
     setChatInput('');
 
     setState((prev) => ({
       ...prev,
-      mentorMessages: [
-        ...prev.mentorMessages,
-        {
-          role: 'user',
-          content: userMessage || 'Ho allegato delle immagini.'
-        }
-      ]
+      mentorMessages: [...prev.mentorMessages, { role: 'user', content: userMessage }]
     }));
 
     setBusy((prev) => ({ ...prev, chat: true }));
@@ -338,8 +358,7 @@ export default function App() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage || 'Analizza queste immagini e dammi feedback tecnico.',
-          images,
+          message: userMessage,
           context: {
             goal,
             level: profile.level,
@@ -364,16 +383,8 @@ export default function App() {
 
       setState((prev) => ({
         ...prev,
-        mentorMessages: [
-          ...prev.mentorMessages,
-          { role: 'assistant', content: data.reply }
-        ]
+        mentorMessages: [...prev.mentorMessages, { role: 'assistant', content: data.reply }]
       }));
-
-      chatFilePreviews.forEach((file) => URL.revokeObjectURL(file.url));
-      setChatFiles([]);
-      setChatFilePreviews([]);
-      if (chatFileInputRef.current) chatFileInputRef.current.value = '';
     } finally {
       setBusy((prev) => ({ ...prev, chat: false }));
     }
@@ -382,7 +393,11 @@ export default function App() {
   function toggleFocus() {
     setState((prev) => ({
       ...prev,
-      focusMode: { ...prev.focusMode, running: !prev.focusMode.running }
+      focusMode: {
+        ...prev.focusMode,
+        running: !prev.focusMode.running,
+        lastTickAt: !prev.focusMode.running ? Date.now() : prev.focusMode.lastTickAt
+      }
     }));
   }
 
@@ -409,12 +424,6 @@ export default function App() {
     chatInput,
     setChatInput,
     onSendMessage: sendMessage,
-    chatFiles,
-    chatFilePreviews,
-    onChatFileChange: handleChatFileChange,
-    onOpenChatFilePicker: openChatFilePicker,
-    onRemoveChatFile: removeChatFile,
-    chatFileInputRef,
     onCreateExercise: createExercise,
     onAnalyzeWork: analyzeWork,
     uploadedFiles,
@@ -429,27 +438,21 @@ export default function App() {
     goTo: setScreen
   };
 
-  const ScreenComponent = {
-    dashboard: Dashboard,
-    exercises: Exercises,
-    session: Session,
-    mentor: Mentor,
-    progress: Progress
-  }[screen] || Dashboard;
+  const ScreenComponent =
+    {
+      dashboard: Dashboard,
+      exercises: Exercises,
+      session: Session,
+      mentor: Mentor,
+      progress: Progress
+    }[screen] || Dashboard;
 
   return (
     <div className="app-shell">
-      <Sidebar
-        active={screen}
-        onNavigate={setScreen}
-        focusMode={state.focusMode}
-        secondsToClock={secondsToClock}
-      />
-
+      <Sidebar active={screen} onNavigate={setScreen} focusMode={state.focusMode} secondsToClock={secondsToClock} />
       <main className="content">
         <ScreenComponent {...screenProps} />
       </main>
-
       <MobileNav active={screen} onNavigate={setScreen} />
     </div>
   );
