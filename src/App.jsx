@@ -59,15 +59,28 @@ function fileToBase64(file) {
   });
 }
 
-function todayKey() {
-  return new Date().toISOString().slice(0, 10);
+function isImageFile(file) {
+  return Boolean(file?.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(file?.name || ''));
+}
+
+function revokePreviewUrls(previews = []) {
+  previews.forEach((file) => {
+    if (file?.url) URL.revokeObjectURL(file.url);
+  });
+}
+
+function todayKey(date = new Date()) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function isYesterday(dateString) {
   if (!dateString) return false;
   const d = new Date();
   d.setDate(d.getDate() - 1);
-  return d.toISOString().slice(0, 10) === dateString;
+  return todayKey(d) === dateString;
 }
 
 function withFocusDefaults(stateLike) {
@@ -77,6 +90,120 @@ function withFocusDefaults(stateLike) {
     focusMode: {
       ...baseFocus,
       ...(stateLike?.focusMode || {})
+    }
+  };
+}
+
+function parseJsonSafely(text) {
+  if (!text) return null;
+  try {
+    return JSON.parse(text);
+  } catch {
+    throw new Error('Risposta non valida dal server.');
+  }
+}
+
+function isValidExercise(data) {
+  return Boolean(
+    data &&
+      typeof data === 'object' &&
+      typeof data.title === 'string' &&
+      typeof data.objective === 'string' &&
+      typeof data.promptText === 'string'
+  );
+}
+
+function clampScore(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 5;
+  return Math.max(1, Math.min(10, Math.round(n)));
+}
+
+function normalizeTextList(value) {
+  return Array.isArray(value) ? value.filter((item) => typeof item === 'string' && item.trim()).slice(0, 3) : [];
+}
+
+function normalizeFeedback(data) {
+  return {
+    opening: typeof data?.opening === 'string' ? data.opening : '',
+    strengths: normalizeTextList(data?.strengths),
+    errors: normalizeTextList(data?.errors),
+    actions: normalizeTextList(data?.actions),
+    closing: typeof data?.closing === 'string' ? data.closing : '',
+    depth: typeof data?.depth === 'string' ? data.depth : 'media',
+    scores: {
+      silhouette: clampScore(data?.scores?.silhouette),
+      structure: clampScore(data?.scores?.structure),
+      clarity: clampScore(data?.scores?.clarity)
+    },
+    recurringErrors: normalizeTextList(data?.recurringErrors || data?.errors)
+  };
+}
+
+function normalizeMentorReply(data) {
+  return typeof data?.reply === 'string' && data.reply.trim()
+    ? data.reply.trim()
+    : 'Ho ricevuto il messaggio, ma la risposta non era completa. Riprova con una richiesta più specifica.';
+}
+
+function applyFocusElapsed(prev, now = Date.now()) {
+  const focus = prev.focusMode;
+  if (!focus.running || !focus.lastTickAt) return prev;
+
+  const elapsed = Math.max(0, Math.floor((now - focus.lastTickAt) / 1000));
+  if (!elapsed) return prev;
+
+  const secondsLeft = Math.max(0, Number(focus.secondsLeft || 0));
+  const applied = Math.min(elapsed, secondsLeft);
+  const completed = applied >= secondsLeft;
+  const nowDay = todayKey(new Date(now));
+  const prevLastStudiedOn = focus.lastStudiedOn;
+
+  let nextStreak = prev.streak;
+  let elapsedSecondsToday = focus.elapsedSecondsToday || 0;
+
+  if (prevLastStudiedOn && prevLastStudiedOn !== nowDay) {
+    elapsedSecondsToday = 0;
+  }
+
+  if (prevLastStudiedOn !== nowDay) {
+    if (isYesterday(prevLastStudiedOn)) {
+      nextStreak = prev.streak + 1;
+    } else if (!prevLastStudiedOn) {
+      nextStreak = Math.max(prev.streak, 1);
+    } else {
+      nextStreak = 1;
+    }
+  }
+
+  elapsedSecondsToday += applied;
+
+  const totalElapsedSeconds = (focus.totalElapsedSeconds || 0) + applied;
+  const nextRecentSessions = completed
+    ? [
+        {
+          type: 'Focus session',
+          when: new Date(now).toLocaleString('it-IT'),
+          minutes: Math.round(focus.duration / 60)
+        },
+        ...(prev.recentSessions || [])
+      ].slice(0, 12)
+    : prev.recentSessions;
+
+  return {
+    ...prev,
+    streak: nextStreak,
+    dailyMinutes: Math.floor(elapsedSecondsToday / 60),
+    totalHours: Number((totalElapsedSeconds / 3600).toFixed(1)),
+    recentSessions: nextRecentSessions,
+    focusMode: {
+      ...focus,
+      running: !completed,
+      secondsLeft: completed ? 0 : secondsLeft - applied,
+      elapsedSecondsToday,
+      totalElapsedSeconds,
+      lastTickAt: completed ? null : focus.lastTickAt + applied * 1000,
+      lastStudiedOn: nowDay
     }
   };
 }
@@ -100,9 +227,15 @@ export default function App() {
   });
   const [memory, setMemory] = useState(null);
   const [curriculum, setCurriculum] = useState(null);
+  const [exerciseError, setExerciseError] = useState('');
   const [uploadedFiles, setUploadedFiles] = useState([]);
   const [filePreviews, setFilePreviews] = useState([]);
   const fileInputRef = useRef(null);
+  const exerciseRequestRef = useRef(false);
+  const feedbackRequestRef = useRef(false);
+  const chatRequestRef = useRef(false);
+  const filePreviewsRef = useRef([]);
+  const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
     saveState(state);
@@ -148,67 +281,39 @@ export default function App() {
     if (!state.focusMode.running) return;
 
     const timer = setInterval(() => {
-      setState((prev) => {
-        const nowDay = todayKey();
-        const prevLastStudiedOn = prev.focusMode.lastStudiedOn;
-        const nextSecondsLeft = Math.max(prev.focusMode.secondsLeft - 1, 0);
-        const completed = nextSecondsLeft === 0;
-
-        let nextStreak = prev.streak;
-        if (prevLastStudiedOn !== nowDay) {
-          if (isYesterday(prevLastStudiedOn)) {
-            nextStreak = prev.streak + 1;
-          } else if (!prevLastStudiedOn) {
-            nextStreak = Math.max(prev.streak, 1);
-          } else {
-            nextStreak = 1;
-          }
-        }
-
-        const elapsedSecondsToday = (prev.focusMode.elapsedSecondsToday || 0) + 1;
-        const totalElapsedSeconds = (prev.focusMode.totalElapsedSeconds || 0) + 1;
-
-        const nextRecentSessions = completed
-          ? [
-              {
-                type: 'Focus session',
-                when: new Date().toLocaleString('it-IT'),
-                minutes: Math.round(prev.focusMode.duration / 60)
-              },
-              ...prev.recentSessions
-            ].slice(0, 12)
-          : prev.recentSessions;
-
-        return {
-          ...prev,
-          streak: nextStreak,
-          dailyMinutes: Math.floor(elapsedSecondsToday / 60),
-          totalHours: Number((totalElapsedSeconds / 3600).toFixed(1)),
-          recentSessions: nextRecentSessions,
-          focusMode: {
-            ...prev.focusMode,
-            running: completed ? false : true,
-            secondsLeft: completed ? prev.focusMode.duration : nextSecondsLeft,
-            elapsedSecondsToday,
-            totalElapsedSeconds,
-            lastTickAt: Date.now(),
-            lastStudiedOn: nowDay
-          }
-        };
-      });
+      setState((prev) => applyFocusElapsed(prev));
     }, 1000);
 
     return () => clearInterval(timer);
   }, [state.focusMode.running]);
 
   useEffect(() => {
+    function syncFocusTimer() {
+      setState((prev) => applyFocusElapsed(prev));
+    }
+
+    window.addEventListener('focus', syncFocusTimer);
+    document.addEventListener('visibilitychange', syncFocusTimer);
+
     return () => {
-      filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+      window.removeEventListener('focus', syncFocusTimer);
+      document.removeEventListener('visibilitychange', syncFocusTimer);
     };
+  }, []);
+
+  useEffect(() => {
+    filePreviewsRef.current = filePreviews;
   }, [filePreviews]);
 
+  useEffect(() => () => revokePreviewUrls(filePreviewsRef.current), []);
+
   async function createExercise(type) {
+    if (exerciseRequestRef.current) return;
+
+    exerciseRequestRef.current = true;
+    setExerciseError('');
     setBusy((prev) => ({ ...prev, exercise: true }));
+
     try {
       const res = await fetch(`${API_BASE}/generate-exercise`, {
         method: 'POST',
@@ -216,11 +321,20 @@ export default function App() {
         body: JSON.stringify({ type, profile })
       });
 
-      const data = await res.json();
+      const data = parseJsonSafely(await res.text());
 
-      filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+      if (!res.ok) {
+        throw new Error(data?.error || 'Non sono riuscito a generare un esercizio.');
+      }
+
+      if (!isValidExercise(data)) {
+        throw new Error('Il server ha restituito un esercizio incompleto.');
+      }
+
+      revokePreviewUrls(filePreviewsRef.current);
       setUploadedFiles([]);
       setFilePreviews([]);
+      setUploadError('');
 
       setState((prev) => ({
         ...prev,
@@ -236,14 +350,41 @@ export default function App() {
       }));
 
       setScreen('session');
+    } catch (err) {
+      console.error('[generate-exercise]', err);
+      setExerciseError(err.message || 'Generazione non riuscita. Riprova tra poco.');
     } finally {
+      exerciseRequestRef.current = false;
       setBusy((prev) => ({ ...prev, exercise: false }));
     }
   }
 
   function handleFileChange(event) {
-    const files = Array.from(event.target.files || []);
-    filePreviews.forEach((file) => URL.revokeObjectURL(file.url));
+    const input = event.target;
+    const selected = Array.from(input.files || []);
+
+    if (!selected.length) {
+      input.value = '';
+      return;
+    }
+
+    const seen = new Set();
+    const files = selected.filter((file) => {
+      const key = `${file.name}-${file.size}-${file.lastModified}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return isImageFile(file);
+    });
+
+    input.value = '';
+
+    if (!files.length) {
+      setUploadError('Seleziona solo file immagine.');
+      return;
+    }
+
+    revokePreviewUrls(filePreviewsRef.current);
+    setUploadError(files.length < selected.length ? 'Alcuni file non immagine sono stati ignorati.' : '');
     setUploadedFiles(files);
 
     const previews = files.map((file) => ({
@@ -252,30 +393,47 @@ export default function App() {
       size: file.size
     }));
 
+    filePreviewsRef.current = previews;
     setFilePreviews(previews);
   }
 
   function openFilePicker() {
+    if (fileInputRef.current) fileInputRef.current.value = '';
     fileInputRef.current?.click();
   }
 
   function removeFile(indexToRemove) {
+    const removed = filePreviewsRef.current[indexToRemove];
+    if (removed?.url) URL.revokeObjectURL(removed.url);
     setUploadedFiles((prev) => prev.filter((_, index) => index !== indexToRemove));
     setFilePreviews((prev) => {
-      const removed = prev[indexToRemove];
-      if (removed?.url) URL.revokeObjectURL(removed.url);
-      return prev.filter((_, index) => index !== indexToRemove);
+      const next = prev.filter((_, index) => index !== indexToRemove);
+      filePreviewsRef.current = next;
+      return next;
     });
+    setUploadError('');
   }
 
   async function analyzeWork() {
-    if (!state.currentExercise) return;
+    if (feedbackRequestRef.current) return;
 
-    if (!uploadedFiles.length) {
-      alert('Carica almeno un elaborato prima di avviare l’analisi.');
+    if (!state.currentExercise?.title) {
+      setUploadError('Genera un esercizio prima di avviare l’analisi.');
       return;
     }
 
+    if (!uploadedFiles.length) {
+      setUploadError('Carica almeno un elaborato prima di avviare l’analisi.');
+      return;
+    }
+
+    if (uploadedFiles.some((file) => !isImageFile(file))) {
+      setUploadError('Rimuovi i file non immagine prima di avviare l’analisi.');
+      return;
+    }
+
+    feedbackRequestRef.current = true;
+    setUploadError('');
     setBusy((prev) => ({ ...prev, feedback: true }));
 
     try {
@@ -301,17 +459,28 @@ export default function App() {
         })
       });
 
-      const data = await res.json();
+      const data = parseJsonSafely(await res.text());
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Analisi non riuscita.');
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Risposta vuota dal server.');
+      }
+
+      const feedback = normalizeFeedback(data);
+      const recurringErrors = feedback.recurringErrors.length ? feedback.recurringErrors : state.recurringErrors;
 
       setState((prev) => ({
         ...prev,
-        feedback: data,
-        recurringErrors: data.recurringErrors || prev.recurringErrors,
+        feedback,
+        recurringErrors: feedback.recurringErrors.length ? feedback.recurringErrors : prev.recurringErrors,
         mentorMessages: [
           ...prev.mentorMessages,
           {
             role: 'assistant',
-            content: `Feedback pronto. Errore prioritario: ${(data.errors || [])[0] || 'nessuno'}`
+            content: `Feedback pronto. Errore prioritario: ${feedback.errors[0] || 'nessuno'}`
           }
         ]
       }));
@@ -320,7 +489,7 @@ export default function App() {
         goal,
         level: profile.level,
         focus: profile.focus,
-        recurringErrors: data.recurringErrors || state.recurringErrors
+        recurringErrors
       };
 
       fetch(`${API_BASE}/student-memory`, {
@@ -334,31 +503,47 @@ export default function App() {
           setCurriculum(payload.curriculum);
         })
         .catch(() => {});
+    } catch (err) {
+      console.error('[analyze-submission]', err);
+      setUploadError(err.message || 'Analisi non riuscita. Controlla le immagini e riprova.');
     } finally {
+      feedbackRequestRef.current = false;
       setBusy((prev) => ({ ...prev, feedback: false }));
     }
   }
 
   async function sendMessage(e) {
     e.preventDefault();
-    if (!chatInput.trim()) return;
+    if (chatRequestRef.current) return;
 
     const userMessage = chatInput.trim();
-    setChatInput('');
+    const hasImages = uploadedFiles.length > 0;
 
+    if (!userMessage && !hasImages) return;
+
+    if (uploadedFiles.some((file) => !isImageFile(file))) {
+      setUploadError('Rimuovi i file non immagine prima di inviare.');
+      return;
+    }
+
+    chatRequestRef.current = true;
+    setUploadError('');
     setState((prev) => ({
       ...prev,
-      mentorMessages: [...prev.mentorMessages, { role: 'user', content: userMessage }]
+      mentorMessages: [...prev.mentorMessages, { role: 'user', content: userMessage || 'Immagini allegate' }]
     }));
 
     setBusy((prev) => ({ ...prev, chat: true }));
 
     try {
+      const images = hasImages ? await Promise.all(uploadedFiles.map(fileToBase64)) : [];
+
       const res = await fetch(`${API_BASE}/mentor-chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          message: userMessage,
+          message: userMessage || 'Analizza le immagini allegate.',
+          images,
           context: {
             goal,
             level: profile.level,
@@ -379,26 +564,62 @@ export default function App() {
         })
       });
 
-      const data = await res.json();
+      const data = parseJsonSafely(await res.text());
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'Risposta del Mentor non riuscita.');
+      }
+
+      if (!data || typeof data !== 'object') {
+        throw new Error('Risposta vuota dal Mentor.');
+      }
+
+      const reply = normalizeMentorReply(data);
 
       setState((prev) => ({
         ...prev,
-        mentorMessages: [...prev.mentorMessages, { role: 'assistant', content: data.reply }]
+        mentorMessages: [...prev.mentorMessages, { role: 'assistant', content: reply }]
       }));
+
+      setChatInput('');
+
+      if (images.length) {
+        revokePreviewUrls(filePreviewsRef.current);
+        filePreviewsRef.current = [];
+        setUploadedFiles([]);
+        setFilePreviews([]);
+        setUploadError('');
+      }
+    } catch (err) {
+      console.error('[mentor-chat]', err);
+      setState((prev) => ({
+        ...prev,
+        mentorMessages: prev.mentorMessages.slice(0, -1)
+      }));
+      setUploadError(err.message || 'Invio non riuscito. Riprova tra poco.');
     } finally {
+      chatRequestRef.current = false;
       setBusy((prev) => ({ ...prev, chat: false }));
     }
   }
 
   function toggleFocus() {
-    setState((prev) => ({
-      ...prev,
-      focusMode: {
-        ...prev.focusMode,
-        running: !prev.focusMode.running,
-        lastTickAt: !prev.focusMode.running ? Date.now() : prev.focusMode.lastTickAt
-      }
-    }));
+    setState((prev) => {
+      const synced = applyFocusElapsed(prev);
+      const focus = synced.focusMode;
+      const starting = !focus.running;
+      const secondsLeft = Math.max(0, focus.secondsLeft || 0);
+
+      return {
+        ...synced,
+        focusMode: {
+          ...focus,
+          running: starting,
+          secondsLeft: starting && secondsLeft === 0 ? focus.duration : secondsLeft,
+          lastTickAt: starting ? Date.now() : null
+        }
+      };
+    });
   }
 
   function resetFocus() {
@@ -407,7 +628,8 @@ export default function App() {
       focusMode: {
         ...prev.focusMode,
         running: false,
-        secondsLeft: prev.focusMode.duration
+        secondsLeft: prev.focusMode.duration,
+        lastTickAt: null
       }
     }));
   }
@@ -419,6 +641,7 @@ export default function App() {
     profile,
     setProfile,
     busy,
+    exerciseError,
     memory,
     curriculum,
     chatInput,
@@ -428,6 +651,7 @@ export default function App() {
     onAnalyzeWork: analyzeWork,
     uploadedFiles,
     filePreviews,
+    uploadError,
     onFileChange: handleFileChange,
     onOpenFilePicker: openFilePicker,
     fileInputRef,

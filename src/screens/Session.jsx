@@ -36,6 +36,7 @@ export default function Session({
   onAnalyzeWork,
   uploadedFiles,
   filePreviews,
+  uploadError,
   onFileChange,
   onOpenFilePicker,
   fileInputRef,
@@ -120,11 +121,17 @@ export default function Session({
         <input
           ref={fileInputRef}
           type="file"
-          accept="image/*"
+          accept="image/*,.heic,.heif"
           multiple
           onChange={onFileChange}
           style={{ display: 'none' }}
         />
+
+        {uploadError ? (
+          <div className="banner banner-error" role="alert">
+            {uploadError}
+          </div>
+        ) : null}
 
         {filePreviews?.length ? (
           <div className="thumb-grid">

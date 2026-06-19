@@ -19,7 +19,7 @@ const TYPES = [
   }
 ];
 
-export default function Exercises({ state, onCreateExercise, busy, goTo }) {
+export default function Exercises({ state, onCreateExercise, busy, exerciseError, goTo }) {
   return (
     <div className="screen">
       <header className="screen-head">
@@ -28,6 +28,12 @@ export default function Exercises({ state, onCreateExercise, busy, goTo }) {
           <h1>Genera la prossima sessione</h1>
         </div>
       </header>
+
+      {exerciseError ? (
+        <div className="banner banner-error" role="alert">
+          {exerciseError}
+        </div>
+      ) : null}
 
       <section className="exercise-grid">
         {TYPES.map((t) => (
@@ -42,7 +48,7 @@ export default function Exercises({ state, onCreateExercise, busy, goTo }) {
               onClick={() => onCreateExercise(t.id)}
               disabled={busy.exercise}
             >
-              {busy.exercise ? 'Genero…' : 'Genera'}
+              {busy.exercise ? 'Genero...' : 'Genera'}
             </button>
           </article>
         ))}

@@ -8,12 +8,14 @@ export default function Mentor({
   busy,
   uploadedFiles,
   filePreviews,
+  uploadError,
   onFileChange,
   onOpenFilePicker,
   fileInputRef,
   onRemoveFile
 }) {
   const logRef = useRef(null);
+  const canSend = Boolean(chatInput.trim() || uploadedFiles.length);
 
   useEffect(() => {
     if (logRef.current) {
@@ -22,7 +24,7 @@ export default function Mentor({
   }, [state.mentorMessages, busy, filePreviews]);
 
   function onKeyDown(e) {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && canSend && !busy.chat) {
       e.preventDefault();
       onSendMessage(e);
     }
@@ -62,11 +64,17 @@ export default function Mentor({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/*"
+            accept="image/*,.heic,.heif"
             multiple
             onChange={onFileChange}
             style={{ display: 'none' }}
           />
+
+          {uploadError ? (
+            <div className="banner banner-error upload-error" role="alert">
+              {uploadError}
+            </div>
+          ) : null}
 
           {filePreviews?.length ? (
             <div className="upload-preview-list compact">
@@ -117,9 +125,9 @@ export default function Mentor({
             <button
               type="submit"
               className="btn primary"
-              disabled={busy.chat || !chatInput.trim()}
+              disabled={busy.chat || !canSend}
             >
-              Invia
+              {busy.chat ? 'Invio...' : 'Invia'}
             </button>
           </div>
         </form>

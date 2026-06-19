@@ -56,6 +56,8 @@ html,
 body,
 #root {
   min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
 }
 
 html {
@@ -747,6 +749,15 @@ textarea:focus {
   color: var(--text);
 }
 
+.banner-error {
+  background: linear-gradient(160deg, rgba(255, 125, 125, 0.14), rgba(255, 125, 125, 0.04));
+  border-color: rgba(255, 125, 125, 0.24);
+}
+
+.upload-error {
+  grid-column: 1 / -1;
+}
+
 .list-clean {
   list-style: none;
   margin: 0;
@@ -1019,20 +1030,68 @@ textarea:focus {
 }
 
 @media (max-width: 880px) {
+  html {
+    padding-top: 0;
+  }
+
+  html,
+  body,
+  #root {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  .app-shell {
+    grid-template-columns: minmax(0, 1fr);
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
   .sidebar {
     display: none;
   }
 
   .mobile-nav {
     display: flex;
+    box-sizing: border-box;
+    max-width: calc(100% - 32px);
+    overflow: hidden;
   }
 
   .content {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    justify-content: center;
     padding: 12px 16px calc(var(--mobile-nav-bottom) + var(--mobile-nav-height) + var(--mobile-nav-gap) + var(--safe-bottom));
+    overflow-x: hidden;
   }
 
   .screen {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
     gap: 18px;
+  }
+
+  .content > *,
+  .screen > *,
+  .card,
+  .grid-2 > *,
+  .grid-3 > *,
+  .brief-grid > *,
+  .exercise-grid > *,
+  .score-row > *,
+  .kv > *,
+  .stat-row > *,
+  .week-plan > *,
+  .chat-shell,
+  .composer,
+  .mobile-nav-item {
+    min-width: 0;
   }
 
   .screen-head {
@@ -1107,7 +1166,7 @@ textarea:focus {
 
 @media (max-width: 520px) {
   .content {
-    padding-inline: 14px;
+    padding: 12px 14px calc(var(--mobile-nav-bottom) + var(--mobile-nav-height) + var(--mobile-nav-gap) + var(--safe-bottom));
   }
 
   .screen {

@@ -7,6 +7,7 @@ export default function Dashboard({
   onToggleFocus,
   onResetFocus,
   secondsToClock,
+  busy,
   goTo
 }) {
   const ex = state.currentExercise;
@@ -19,7 +20,9 @@ export default function Dashboard({
           <p className="eyebrow">Bentornato</p>
           <h1>Studio di oggi</h1>
         </div>
-        <button className="btn primary" onClick={() => goTo('exercises')}>Nuovo esercizio</button>
+        <button className="btn primary" onClick={() => goTo('exercises')} disabled={busy.exercise}>
+          {busy.exercise ? 'Genero...' : 'Nuovo esercizio'}
+        </button>
       </header>
 
       <section className="stat-row">
@@ -73,7 +76,9 @@ export default function Dashboard({
           ) : (
             <>
               <p className="muted">Nessun esercizio assegnato. Generane uno per cominciare.</p>
-              <button className="btn primary" onClick={() => goTo('exercises')}>Genera esercizio</button>
+              <button className="btn primary" onClick={() => goTo('exercises')} disabled={busy.exercise}>
+                {busy.exercise ? 'Genero...' : 'Genera esercizio'}
+              </button>
             </>
           )}
         </section>
