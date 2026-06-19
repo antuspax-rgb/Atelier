@@ -41,6 +41,9 @@
 
   --safe-top-space: max(18px, var(--safe-top));
   --safe-bottom-space: max(8px, var(--safe-bottom));
+  --mobile-nav-bottom: 48px;
+  --mobile-nav-height: 62px;
+  --mobile-nav-gap: 12px;
 
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
@@ -981,9 +984,9 @@ textarea:focus {
 .mobile-nav {
   display: none;
   position: fixed;
-  left:  16px !important;
-  right: 16px !important;
-  bottom: 48px !important;
+  left: 16px;
+  right: 16px;
+  bottom: var(--mobile-nav-bottom);
   padding: 8px;
   background: rgba(16, 20, 27, 0.92);
   backdrop-filter: blur(18px);
@@ -1016,11 +1019,6 @@ textarea:focus {
 }
 
 @media (max-width: 880px) {
-  .content {
-    padding: 12px 16px calc(170px + var(--safe-bottom)) !important;
-  }
-}
-
   .sidebar {
     display: none;
   }
@@ -1030,7 +1028,7 @@ textarea:focus {
   }
 
   .content {
-    padding: 12px 16px calc(112px + var(--safe-bottom));
+    padding: 12px 16px calc(var(--mobile-nav-bottom) + var(--mobile-nav-height) + var(--mobile-nav-gap) + var(--safe-bottom));
   }
 
   .screen {
@@ -1105,11 +1103,12 @@ textarea:focus {
     grid-column: 1 / -1;
     width: 100%;
   }
+}
 
 @media (max-width: 520px) {
   .content {
-  padding: 12px 14px calc(230px + var(--safe-bottom)) !important;
-}
+    padding-inline: 14px;
+  }
 
   .screen {
     gap: 16px;
