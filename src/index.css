@@ -1112,10 +1112,6 @@ textarea:focus {
     padding: 12px 14px calc(190px + var(--safe-bottom)) !important;
   }
 
-  .content {
-    padding: 12px 14px calc(116px + var(--safe-bottom));
-  }
-
   .screen {
     gap: 16px;
   }
@@ -1123,7 +1119,7 @@ textarea:focus {
   .screen-head {
     margin-bottom: 4px;
   }
-
+}
   .eyebrow {
     margin-bottom: 10px;
   }
