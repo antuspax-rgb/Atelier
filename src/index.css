@@ -1105,7 +1105,6 @@ textarea:focus {
     grid-column: 1 / -1;
     width: 100%;
   }
-}
 
 @media (max-width: 520px) {
   .content {
@@ -1119,7 +1118,7 @@ textarea:focus {
   .screen-head {
     margin-bottom: 4px;
   }
-}
+
   .eyebrow {
     margin-bottom: 10px;
   }
