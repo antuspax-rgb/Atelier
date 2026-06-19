@@ -1108,8 +1108,8 @@ textarea:focus {
 
 @media (max-width: 520px) {
   .content {
-    padding: 12px 14px calc(190px + var(--safe-bottom)) !important;
-  }
+  padding: 12px 14px calc(230px + var(--safe-bottom)) !important;
+}
 
   .screen {
     gap: 16px;
