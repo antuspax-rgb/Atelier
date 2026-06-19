@@ -1111,7 +1111,6 @@ textarea:focus {
   .content {
     padding: 12px 14px calc(190px + var(--safe-bottom)) !important;
   }
-}
 
   .content {
     padding: 12px 14px calc(116px + var(--safe-bottom));
