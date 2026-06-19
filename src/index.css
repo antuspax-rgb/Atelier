@@ -981,9 +981,9 @@ textarea:focus {
 .mobile-nav {
   display: none;
   position: fixed;
-  left: 12px;
-  right: 12px;
-  bottom: calc(var(--safe-bottom) + 18px);
+  left:  16px !important;
+  right: 16px !important;
+  bottom: 48px !important;
   padding: 8px;
   background: rgba(16, 20, 27, 0.92);
   backdrop-filter: blur(18px);
