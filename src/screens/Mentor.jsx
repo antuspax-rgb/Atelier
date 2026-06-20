@@ -1,4 +1,23 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+
+function MessageAttachment({ file, fileIndex, onLoad }) {
+  const [failed, setFailed] = useState(false);
+  const src = file?.url || file?.thumbnailDataUrl;
+
+  if (!src || failed) {
+    return <span className="msg-attachment-missing">Allegato inviato · anteprima non più disponibile</span>;
+  }
+
+  return (
+    <img
+      src={src}
+      alt={file.name || `Immagine ${fileIndex + 1}`}
+      className="msg-attachment-thumb"
+      onLoad={onLoad}
+      onError={() => setFailed(true)}
+    />
+  );
+}
 
 export default function Mentor({
   state,
@@ -15,13 +34,47 @@ export default function Mentor({
   onRemoveFile
 }) {
   const logRef = useRef(null);
+  const bottomRef = useRef(null);
+  const shouldStickToBottomRef = useRef(true);
+  const messages = useMemo(() => (Array.isArray(state.mentorMessages) ? state.mentorMessages : []), [state.mentorMessages]);
   const canSend = Boolean(chatInput.trim() || uploadedFiles.length);
 
-  useEffect(() => {
-    if (logRef.current) {
-      logRef.current.scrollTop = logRef.current.scrollHeight;
+  function scrollToBottom(force = false) {
+    const node = logRef.current;
+    if (force) shouldStickToBottomRef.current = true;
+    if (node) {
+      node.scrollTop = node.scrollHeight;
+      node.scrollTo({ top: node.scrollHeight });
     }
-  }, [state.mentorMessages, busy, filePreviews]);
+    bottomRef.current?.scrollIntoView({ block: 'end', inline: 'nearest' });
+  }
+
+  function settleAtBottom(force = false) {
+    scrollToBottom(force);
+    requestAnimationFrame(() => {
+      scrollToBottom(force);
+      requestAnimationFrame(() => scrollToBottom(force));
+    });
+    setTimeout(() => scrollToBottom(force), 80);
+    setTimeout(() => scrollToBottom(force), 220);
+  }
+
+  function onChatScroll() {
+    const node = logRef.current;
+    if (!node) return;
+    const distanceFromBottom = node.scrollHeight - node.scrollTop - node.clientHeight;
+    shouldStickToBottomRef.current = distanceFromBottom < 80;
+  }
+
+  useLayoutEffect(() => {
+    settleAtBottom(true);
+  }, []);
+
+  useEffect(() => {
+    if (shouldStickToBottomRef.current) {
+      settleAtBottom();
+    }
+  }, [messages, busy.chat, filePreviews]);
 
   function onKeyDown(e) {
     if (e.key === 'Enter' && !e.shiftKey && canSend && !busy.chat) {
@@ -40,11 +93,25 @@ export default function Mentor({
       </header>
 
       <div className="chat-shell card">
-        <div className="chat" ref={logRef}>
-          {state.mentorMessages.map((msg, idx) => (
+        <div className="chat" ref={logRef} onScroll={onChatScroll}>
+          {messages.map((msg, idx) => (
             <article key={idx} className={`msg msg-${msg.role}`}>
               <span className="msg-role">{msg.role === 'assistant' ? 'Mentor' : 'Tu'}</span>
-              <p>{msg.content}</p>
+              <p>{msg.content || 'Messaggio non disponibile.'}</p>
+              {Array.isArray(msg.attachments) && msg.attachments.length ? (
+                <div className="msg-attachments">
+                  {msg.attachments.map((file, fileIndex) => (
+                    <MessageAttachment
+                      key={`${file?.url || file?.name || 'attachment'}-${fileIndex}`}
+                      file={file}
+                      fileIndex={fileIndex}
+                      onLoad={() => {
+                        if (shouldStickToBottomRef.current) scrollToBottom();
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </article>
           ))}
 
@@ -58,6 +125,7 @@ export default function Mentor({
               </p>
             </article>
           ) : null}
+          <div ref={bottomRef} aria-hidden="true" />
         </div>
 
         <form className="composer" onSubmit={onSendMessage}>
@@ -116,8 +184,9 @@ export default function Mentor({
           <div className="chat-actions">
             <button
               type="button"
-              className="btn ghost"
+              className="btn ghost btn-compact"
               onClick={onOpenFilePicker}
+              disabled={busy.chat}
             >
               Aggiungi immagini
             </button>

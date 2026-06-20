@@ -58,7 +58,8 @@ function normalizeChatReply(data = {}) {
     reply:
       typeof data.reply === "string" && data.reply.trim()
         ? data.reply.trim()
-        : "Va bene. Mandami il contesto preciso e ti aiuto a chiarire il prossimo passo."
+        : "Va bene. Mandami il contesto preciso e ti aiuto a chiarire il prossimo passo.",
+    actions: Array.isArray(data.actions) ? data.actions : []
   };
 }
 

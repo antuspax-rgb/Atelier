@@ -20,6 +20,9 @@ const TYPES = [
 ];
 
 export default function Exercises({ state, onCreateExercise, busy, exerciseError, goTo }) {
+  const recentSessions = Array.isArray(state.recentSessions) ? state.recentSessions : [];
+  const currentExercise = state.currentExercise;
+
   return (
     <div className="screen">
       <header className="screen-head">
@@ -58,12 +61,12 @@ export default function Exercises({ state, onCreateExercise, busy, exerciseError
         <div className="card-head">
           <h2>Sessioni recenti</h2>
         </div>
-        {state.recentSessions?.length ? (
+        {recentSessions.length ? (
           <ul className="list-clean">
-            {state.recentSessions.map((s, i) => (
+            {recentSessions.map((s, i) => (
               <li key={i} className="list-row">
-                <span>{s.type}</span>
-                <span className="muted small">{s.when}</span>
+                <span>{s?.type || 'Sessione'}</span>
+                <span className="muted small">{s?.when || '—'}</span>
               </li>
             ))}
           </ul>
@@ -72,16 +75,17 @@ export default function Exercises({ state, onCreateExercise, busy, exerciseError
         )}
       </section>
 
-      {state.currentExercise ? (
+      {currentExercise ? (
         <section className="card">
           <div className="card-head">
             <h2>Esercizio in corso</h2>
             <button className="btn link" onClick={() => goTo('session')}>Vai alla sessione →</button>
           </div>
-          <h3 className="lead">{state.currentExercise.title}</h3>
+          <h3 className="lead">{currentExercise.title || 'Esercizio Atelier'}</h3>
           <p className="muted small">
-            {state.currentExercise.category} · {state.currentExercise.difficulty} · {state.currentExercise.duration} min
+            {currentExercise.category || 'Concept Art'} · {currentExercise.difficulty || 'Studio'} · {currentExercise.duration || '—'} min
           </p>
+          <p className="body">{currentExercise.objective || currentExercise.promptText || 'Brief aggiornato dal Mentor.'}</p>
         </section>
       ) : null}
     </div>

@@ -10,20 +10,27 @@ function scoreTone(v) {
   return 'low';
 }
 
+function safeScore(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10, n));
+}
+
 function normalizeScores(fb) {
   if (!fb?.scores) return null;
   return [
-    { label: 'Silhouette', value: Number(fb.scores.silhouette || 0) },
-    { label: 'Struttura', value: Number(fb.scores.structure || 0) },
-    { label: 'Chiarezza', value: Number(fb.scores.clarity || 0) }
+    { label: 'Silhouette', value: safeScore(fb.scores.silhouette) },
+    { label: 'Struttura', value: safeScore(fb.scores.structure) },
+    { label: 'Chiarezza', value: safeScore(fb.scores.clarity) }
   ];
 }
 
 function List({ items, empty }) {
-  if (!items?.length) return <p className="muted small">{empty}</p>;
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return <p className="muted small">{empty}</p>;
   return (
     <ul className="list-clean">
-      {items.map((x, i) => (
+      {list.map((x, i) => (
         <li key={i} className="list-row">{x}</li>
       ))}
     </ul>
@@ -68,8 +75,8 @@ export default function Session({
     <div className="screen">
       <header className="screen-head">
         <div>
-          <p className="eyebrow">{ex.category} · {ex.difficulty} · {ex.duration} min</p>
-          <h1>{ex.title}</h1>
+          <p className="eyebrow">{ex.category || 'Concept Art'} · {ex.difficulty || 'Studio'} · {ex.duration || '—'} min</p>
+          <h1>{ex.title || 'Esercizio Atelier'}</h1>
         </div>
       </header>
 
@@ -77,11 +84,11 @@ export default function Session({
         <div className="brief-grid">
           <div>
             <p className="field-label">Obiettivo</p>
-            <p className="body">{ex.objective}</p>
+            <p className="body">{ex.objective || 'Allenare una competenza chiave di concept art.'}</p>
           </div>
           <div>
             <p className="field-label">Brief</p>
-            <p className="body">{ex.promptText}</p>
+            <p className="body">{ex.promptText || 'Svolgi il brief con ordine e chiarezza.'}</p>
           </div>
           {ex.notes ? (
             <div>
@@ -108,7 +115,7 @@ export default function Session({
         <div className="card-head">
           <h2>Carica elaborato</h2>
           <div className="row gap">
-            <button className="btn ghost" onClick={onOpenFilePicker}>Seleziona file</button>
+            <button className="btn ghost btn-compact" onClick={onOpenFilePicker}>Seleziona file</button>
             <button
               className="btn primary"
               onClick={onAnalyzeWork}

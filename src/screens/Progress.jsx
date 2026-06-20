@@ -1,8 +1,9 @@
 function List({ items, empty }) {
-  if (!items?.length) return <p className="muted small">{empty}</p>;
+  const list = Array.isArray(items) ? items : [];
+  if (!list.length) return <p className="muted small">{empty}</p>;
   return (
     <ul className="list-clean">
-      {items.map((x, i) => (
+      {list.map((x, i) => (
         <li key={i} className="list-row">{x}</li>
       ))}
     </ul>
@@ -10,6 +11,10 @@ function List({ items, empty }) {
 }
 
 export default function Progress({ state, memory, curriculum }) {
+  const recurringErrors = Array.isArray(state.recurringErrors) ? state.recurringErrors : [];
+  const recentSessions = Array.isArray(state.recentSessions) ? state.recentSessions : [];
+  const weeklyPlan = Array.isArray(curriculum?.weeklyPlan) ? curriculum.weeklyPlan : [];
+
   return (
     <div className="screen">
       <header className="screen-head">
@@ -22,15 +27,15 @@ export default function Progress({ state, memory, curriculum }) {
       <section className="stat-row">
         <article className="stat-card">
           <span className="stat-label">Streak</span>
-          <strong className="stat-value">{state.streak}<small>giorni</small></strong>
+          <strong className="stat-value">{state.streak || 0}<small>giorni</small></strong>
         </article>
         <article className="stat-card">
           <span className="stat-label">Ore studio</span>
-          <strong className="stat-value">{state.totalHours}<small>h</small></strong>
+          <strong className="stat-value">{state.totalHours || 0}<small>h</small></strong>
         </article>
         <article className="stat-card">
           <span className="stat-label">Sessioni</span>
-          <strong className="stat-value">{state.recentSessions?.length || 0}</strong>
+          <strong className="stat-value">{recentSessions.length}</strong>
         </article>
       </section>
 
@@ -58,17 +63,17 @@ export default function Progress({ state, memory, curriculum }) {
 
       <section className="card">
         <div className="card-head"><h2>Errori ricorrenti</h2></div>
-        <List items={state.recurringErrors} empty="Nessun errore ricorrente registrato." />
+        <List items={recurringErrors} empty="Nessun errore ricorrente registrato." />
       </section>
 
       <section className="card">
         <div className="card-head"><h2>Piano settimanale</h2></div>
-        {curriculum?.weeklyPlan?.length ? (
+        {weeklyPlan.length ? (
           <ul className="week-plan">
-            {curriculum.weeklyPlan.map((item, i) => (
+            {weeklyPlan.map((item, i) => (
               <li key={i}>
-                <strong>{item.day}</strong>
-                <span className="muted">{item.focus}</span>
+                <strong>{item?.day || `Giorno ${i + 1}`}</strong>
+                <span className="muted">{item?.focus || 'Studio guidato'}</span>
               </li>
             ))}
           </ul>

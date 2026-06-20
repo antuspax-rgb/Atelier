@@ -6,12 +6,18 @@ export default function Dashboard({
   setProfile,
   onToggleFocus,
   onResetFocus,
+  onToggleBlockedApp,
   secondsToClock,
   busy,
   goTo
 }) {
   const ex = state.currentExercise;
   const fb = state.feedback;
+  const focusMode = state.focusMode || {};
+  const blockedApps = Array.isArray(focusMode.blockedApps) ? focusMode.blockedApps : [];
+  const distractors = ['Instagram', 'TikTok', 'YouTube', 'X', 'Discord'];
+  const todayMinutes = state.dailyMinutes || 0;
+  const todayLabel = !todayMinutes && focusMode.elapsedSecondsToday > 0 ? '<1' : todayMinutes;
 
   return (
     <div className="screen">
@@ -28,19 +34,19 @@ export default function Dashboard({
       <section className="stat-row">
         <article className="stat-card">
           <span className="stat-label">Streak</span>
-          <strong className="stat-value">{state.streak}<small>giorni</small></strong>
+          <strong className="stat-value">{state.streak || 0}<small>giorni</small></strong>
         </article>
         <article className="stat-card">
           <span className="stat-label">Ore totali</span>
-          <strong className="stat-value">{state.totalHours}<small>h</small></strong>
+          <strong className="stat-value">{state.totalHours || 0}<small>h</small></strong>
         </article>
         <article className="stat-card">
           <span className="stat-label">Oggi</span>
-          <strong className="stat-value">{state.dailyMinutes}<small>min</small></strong>
+          <strong className="stat-value">{todayLabel}<small>min</small></strong>
         </article>
         <article className="stat-card stat-card-accent">
           <span className="stat-label">Focus</span>
-          <strong className="stat-value mono">{secondsToClock(state.focusMode.secondsLeft)}</strong>
+          <strong className="stat-value mono">{secondsToClock(focusMode.secondsLeft)}</strong>
         </article>
       </section>
 
@@ -48,16 +54,31 @@ export default function Dashboard({
         <section className="card">
           <div className="card-head">
             <h2>Focus session</h2>
-            <span className={`pill ${state.focusMode.running ? 'pill-live' : ''}`}>
-              {state.focusMode.running ? 'In corso' : 'In pausa'}
+            <span className={`pill ${focusMode.running ? 'pill-live' : ''}`}>
+              {focusMode.running ? 'In corso' : 'In pausa'}
             </span>
           </div>
-          <div className="focus-timer-large mono">{secondsToClock(state.focusMode.secondsLeft)}</div>
+          <div className="focus-timer-large mono">{secondsToClock(focusMode.secondsLeft)}</div>
           <div className="row gap">
             <button className="btn primary" onClick={onToggleFocus}>
-              {state.focusMode.running ? 'Pausa' : 'Avvia'}
+              {focusMode.running ? 'Pausa' : 'Avvia'}
             </button>
             <button className="btn ghost" onClick={onResetFocus}>Reset</button>
+          </div>
+          <div className="focus-blockers">
+            <p className="muted small">Promemoria focus: preferenze salvate. Il blocco reale iOS richiede integrazione nativa dedicata.</p>
+            <div className="blocker-list">
+              {distractors.map((app) => (
+                <label key={app} className="blocker-chip">
+                  <input
+                    type="checkbox"
+                    checked={blockedApps.includes(app)}
+                    onChange={() => onToggleBlockedApp(app)}
+                  />
+                  <span>{app}</span>
+                </label>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -68,9 +89,9 @@ export default function Dashboard({
           </div>
           {ex ? (
             <>
-              <h3 className="lead">{ex.title}</h3>
-              <p className="muted small">{ex.category} · {ex.difficulty} · {ex.duration} min</p>
-              <p className="body">{ex.objective}</p>
+              <h3 className="lead">{ex.title || 'Esercizio Atelier'}</h3>
+              <p className="muted small">{ex.category || 'Concept Art'} · {ex.difficulty || 'Studio'} · {ex.duration || '—'} min</p>
+              <p className="body">{ex.objective || 'Apri la sessione per leggere il brief completo.'}</p>
               <button className="btn ghost" onClick={() => goTo('session')}>Apri sessione</button>
             </>
           ) : (

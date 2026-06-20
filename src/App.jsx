@@ -39,8 +39,9 @@ const defaultState = {
 };
 
 function secondsToClock(value) {
-  const min = String(Math.floor(value / 60)).padStart(2, '0');
-  const sec = String(value % 60).padStart(2, '0');
+  const safeValue = Math.max(0, Number.isFinite(Number(value)) ? Number(value) : 0);
+  const min = String(Math.floor(safeValue / 60)).padStart(2, '0');
+  const sec = String(safeValue % 60).padStart(2, '0');
   return `${min}:${sec}`;
 }
 
@@ -59,6 +60,37 @@ function fileToBase64(file) {
   });
 }
 
+function createImageThumbnail(file, maxSize = 160, quality = 0.55) {
+  return new Promise((resolve) => {
+    if (!isImageFile(file)) {
+      resolve('');
+      return;
+    }
+
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+
+    image.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
+      const width = Math.max(1, Math.round(image.width * scale));
+      const height = Math.max(1, Math.round(image.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext('2d')?.drawImage(image, 0, 0, width, height);
+      URL.revokeObjectURL(url);
+      resolve(canvas.toDataURL('image/jpeg', quality));
+    };
+
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve('');
+    };
+
+    image.src = url;
+  });
+}
+
 function isImageFile(file) {
   return Boolean(file?.type?.startsWith('image/') || /\.(png|jpe?g|webp|gif|heic|heif)$/i.test(file?.name || ''));
 }
@@ -66,6 +98,12 @@ function isImageFile(file) {
 function revokePreviewUrls(previews = []) {
   previews.forEach((file) => {
     if (file?.url) URL.revokeObjectURL(file.url);
+  });
+}
+
+function revokePreviewUrlStrings(urls = []) {
+  urls.forEach((url) => {
+    if (url) URL.revokeObjectURL(url);
   });
 }
 
@@ -87,6 +125,20 @@ function withFocusDefaults(stateLike) {
   const baseFocus = defaultState.focusMode;
   return {
     ...stateLike,
+    recurringErrors: Array.isArray(stateLike?.recurringErrors) ? stateLike.recurringErrors : [],
+    recentSessions: Array.isArray(stateLike?.recentSessions) ? stateLike.recentSessions : [],
+    mentorMessages: Array.isArray(stateLike?.mentorMessages)
+      ? stateLike.mentorMessages.map((message) => ({
+          ...message,
+          attachments: Array.isArray(message.attachments)
+            ? message.attachments.map((file) =>
+                file?.url?.startsWith('blob:')
+                  ? { ...file, url: '', previewUnavailable: !file.thumbnailDataUrl }
+                  : file
+              )
+            : undefined
+        }))
+      : defaultState.mentorMessages,
     focusMode: {
       ...baseFocus,
       ...(stateLike?.focusMode || {})
@@ -146,6 +198,110 @@ function normalizeMentorReply(data) {
     : 'Ho ricevuto il messaggio, ma la risposta non era completa. Riprova con una richiesta più specifica.';
 }
 
+function cleanActionValue(value, max = 220) {
+  if (typeof value === 'string' && value.trim()) return value.trim().slice(0, max);
+  if (value && typeof value === 'object') {
+    return cleanActionValue(value.value || value.focus || value.goal || value.level || value.text, max);
+  }
+  return '';
+}
+
+function getActionValue(action, max) {
+  return cleanActionValue(action.value || action.newValue || action.focus || action.goal || action.level, max);
+}
+
+function normalizeExercisePatch(patch = {}) {
+  if (!patch || typeof patch !== 'object') return {};
+  const safePatch = {
+    type: cleanActionValue(patch.type, 40) || 'custom',
+    title: cleanActionValue(patch.title, 120),
+    difficulty: cleanActionValue(patch.difficulty, 80),
+    category: cleanActionValue(patch.category, 120),
+    objective: cleanActionValue(patch.objective, 360),
+    promptText: cleanActionValue(patch.promptText || patch.brief, 900),
+    notes: cleanActionValue(patch.notes || patch.constraints, 600)
+  };
+
+  if (Number.isFinite(Number(patch.duration))) {
+    safePatch.duration = Math.max(5, Math.min(240, Math.round(Number(patch.duration))));
+  }
+
+  return Object.fromEntries(Object.entries(safePatch).filter(([, value]) => value));
+}
+
+function extractRequestedFocus(message = '') {
+  const text = String(message);
+  const quoted = text.match(/["“”'‘’]([^"“”'‘’]{3,180})["“”'‘’]/);
+  const match =
+    quoted ||
+    text.match(/(?:focus|fuoco)\s*(?:è|e'|=|in|su|a|verso|:)\s*([a-zà-ù0-9][^.,;!?]{2,80})/i) ||
+    text.match(/concentrarm[ia]?\s+(?:su|sul|sulla|in|nel|nella)\s*([a-zà-ù0-9][^.,;!?]{2,80})/i);
+
+  return match ? cleanActionValue(match[1].replace(/\s+(per favore|grazie)$/i, ''), 180) : '';
+}
+
+function buildLocalMentorActions(message = '') {
+  const focus = extractRequestedFocus(message);
+  const wantsFocusUpdate =
+    /(cambia|aggiorna|imposta|modifica).{0,32}(focus|fuoco)/i.test(message) ||
+    /(voglio|vorrei).{0,32}concentrarm/i.test(message) ||
+    /(?:focus|fuoco)\s*(?:è|e'|=|in|su|a|verso|:)/i.test(message);
+
+  return wantsFocusUpdate && focus ? [{ type: 'update_focus', value: focus }] : [];
+}
+
+function buildRecentMentorContext(messages = []) {
+  return Array.isArray(messages)
+    ? messages
+        .slice(-8)
+        .map((message) => ({
+          role: message.role,
+          content: cleanActionValue(message.content, 420)
+        }))
+        .filter((message) => message.role && message.content)
+    : [];
+}
+
+function normalizeMentorActions(actions) {
+  if (!Array.isArray(actions)) return [];
+
+  return actions
+    .map((action) => {
+      if (!action || typeof action !== 'object') return null;
+
+      if (['update_goal', 'update_focus', 'update_level'].includes(action.type)) {
+        const value = getActionValue(action);
+        return value ? { type: action.type, value } : null;
+      }
+
+      if (action.type === 'update_profile_field') {
+        const field = action.field === 'level' ? 'level' : action.field === 'focus' ? 'focus' : '';
+        const value = getActionValue(action);
+        return field && value ? { type: action.type, field, value } : null;
+      }
+
+      if (action.type === 'revise_current_exercise') {
+        const safePatch = normalizeExercisePatch(action.patch);
+        return Object.values(safePatch).some(Boolean) ? { type: action.type, patch: safePatch } : null;
+      }
+
+      if (['create_exercise', 'update_exercise'].includes(action.type)) {
+        const safePatch = normalizeExercisePatch(action.exercise || action.patch || action);
+        return safePatch.title || safePatch.objective || safePatch.promptText
+          ? { type: action.type, patch: safePatch }
+          : null;
+      }
+
+      if (action.type === 'delete_exercise') {
+        return { type: action.type };
+      }
+
+      return null;
+    })
+    .filter(Boolean)
+    .slice(0, 4);
+}
+
 function applyFocusElapsed(prev, now = Date.now()) {
   const focus = prev.focusMode;
   if (!focus.running || !focus.lastTickAt) return prev;
@@ -194,7 +350,7 @@ function applyFocusElapsed(prev, now = Date.now()) {
     ...prev,
     streak: nextStreak,
     dailyMinutes: Math.floor(elapsedSecondsToday / 60),
-    totalHours: Number((totalElapsedSeconds / 3600).toFixed(1)),
+    totalHours: Number((totalElapsedSeconds / 3600).toFixed(2)),
     recentSessions: nextRecentSessions,
     focusMode: {
       ...focus,
@@ -214,11 +370,11 @@ export default function App() {
   const [screen, setScreen] = useState('dashboard');
   const [chatInput, setChatInput] = useState('');
   const [goal, setGoal] = useState(
-    'Diventare concept artist AAA/cinema con focus su concept art, character design e creature design.'
+    saved?.goal || 'Diventare concept artist AAA/cinema con focus su concept art, character design e creature design.'
   );
   const [profile, setProfile] = useState({
-    focus: 'character design e creature design',
-    level: 'developing'
+    focus: saved?.profile?.focus || 'character design e creature design',
+    level: saved?.profile?.level || 'developing'
   });
   const [busy, setBusy] = useState({
     exercise: false,
@@ -235,11 +391,12 @@ export default function App() {
   const feedbackRequestRef = useRef(false);
   const chatRequestRef = useRef(false);
   const filePreviewsRef = useRef([]);
+  const sentPreviewUrlsRef = useRef([]);
   const [uploadError, setUploadError] = useState('');
 
   useEffect(() => {
-    saveState(state);
-  }, [state]);
+    saveState({ ...state, goal, profile });
+  }, [state, goal, profile]);
 
   useEffect(() => {
     fetch(`${API_BASE}/health`)
@@ -305,7 +462,13 @@ export default function App() {
     filePreviewsRef.current = filePreviews;
   }, [filePreviews]);
 
-  useEffect(() => () => revokePreviewUrls(filePreviewsRef.current), []);
+  useEffect(
+    () => () => {
+      revokePreviewUrls(filePreviewsRef.current);
+      revokePreviewUrlStrings(sentPreviewUrlsRef.current);
+    },
+    []
+  );
 
   async function createExercise(type) {
     if (exerciseRequestRef.current) return;
@@ -344,7 +507,7 @@ export default function App() {
           ...prev.mentorMessages,
           {
             role: 'assistant',
-            content: `Nuovo esercizio assegnato: ${data.title}. Concentrati su: ${data.objective}`
+            content: `Nuovo esercizio assegnato: ${data.title}. Prima blocca silhouette e forme grandi, poi passa ai dettagli. Focus: ${data.objective}`
           }
         ]
       }));
@@ -480,7 +643,7 @@ export default function App() {
           ...prev.mentorMessages,
           {
             role: 'assistant',
-            content: `Feedback pronto. Errore prioritario: ${feedback.errors[0] || 'nessuno'}`
+            content: `Feedback pronto. Prossimo focus: ${feedback.errors[0] || feedback.actions[0] || 'mantieni chiarezza e struttura nel prossimo studio.'}`
           }
         ]
       }));
@@ -512,6 +675,113 @@ export default function App() {
     }
   }
 
+  function applyMentorActions(actions) {
+    const validActions = normalizeMentorActions(actions);
+    if (!validActions.length) return '';
+
+    const confirmations = [];
+
+    validActions.forEach((action) => {
+      if (action.type === 'update_goal') {
+        setGoal(action.value);
+        setMemory((prev) => ({ ...(prev || {}), goal: action.value }));
+        confirmations.push('obiettivo aggiornato');
+      }
+
+      if (action.type === 'update_focus') {
+        setProfile((prev) => ({ ...prev, focus: action.value }));
+        setMemory((prev) => ({ ...(prev || {}), focus: action.value }));
+        confirmations.push('focus aggiornato');
+      }
+
+      if (action.type === 'update_level') {
+        setProfile((prev) => ({ ...prev, level: action.value }));
+        setMemory((prev) => ({ ...(prev || {}), level: action.value }));
+        confirmations.push('livello aggiornato');
+      }
+
+      if (action.type === 'update_profile_field') {
+        setProfile((prev) => ({ ...prev, [action.field]: action.value }));
+        setMemory((prev) => ({ ...(prev || {}), [action.field]: action.value }));
+        confirmations.push(action.field === 'focus' ? 'focus aggiornato' : 'livello aggiornato');
+      }
+
+      if (action.type === 'revise_current_exercise') {
+        if (!state.currentExercise) {
+          confirmations.push('nessun esercizio attivo da rivedere');
+          return;
+        }
+
+        setState((prev) => {
+          if (!prev.currentExercise) return prev;
+          return {
+            ...prev,
+            currentExercise: {
+              ...prev.currentExercise,
+              ...Object.fromEntries(Object.entries(action.patch).filter(([, value]) => value))
+            },
+            feedback: null
+          };
+        });
+        confirmations.push('consegna aggiornata');
+      }
+
+      if (action.type === 'create_exercise') {
+        setState((prev) => ({
+          ...prev,
+          currentExercise: {
+            type: 'custom',
+            difficulty: 'Studio',
+            category: prev.currentExercise?.category || profile.focus || 'Concept Art',
+            duration: 45,
+            ...action.patch,
+            title: action.patch.title || 'Esercizio Mentor',
+            objective: action.patch.objective || 'Allenare il focus attuale con una consegna mirata.',
+            promptText: action.patch.promptText || action.patch.objective || 'Svolgi il brief con ordine e chiarezza.'
+          },
+          feedback: null
+        }));
+        confirmations.push('nuovo esercizio creato');
+      }
+
+      if (action.type === 'update_exercise') {
+        if (!state.currentExercise) {
+          confirmations.push('nessun esercizio attivo da aggiornare');
+          return;
+        }
+
+        setState((prev) => {
+          if (!prev.currentExercise) return prev;
+          return {
+            ...prev,
+            currentExercise: {
+              ...prev.currentExercise,
+              ...action.patch
+            },
+            feedback: null
+          };
+        });
+        confirmations.push('esercizio aggiornato');
+      }
+
+      if (action.type === 'delete_exercise') {
+        if (!state.currentExercise) {
+          confirmations.push('nessun esercizio attivo da rimuovere');
+          return;
+        }
+
+        setState((prev) => ({
+          ...prev,
+          currentExercise: null,
+          feedback: null
+        }));
+        confirmations.push('esercizio rimosso');
+      }
+    });
+
+    return [...new Set(confirmations)].join(', ');
+  }
+
   async function sendMessage(e) {
     e.preventDefault();
     if (chatRequestRef.current) return;
@@ -528,12 +798,26 @@ export default function App() {
 
     chatRequestRef.current = true;
     setUploadError('');
+    setBusy((prev) => ({ ...prev, chat: true }));
+
+    const messageAttachments = hasImages
+      ? await Promise.all(
+          filePreviewsRef.current.map(async (file, index) => ({
+            name: file.name || uploadedFiles[index]?.name || `Immagine ${index + 1}`,
+            url: file.url,
+            thumbnailDataUrl: await createImageThumbnail(uploadedFiles[index]),
+            size: file.size || uploadedFiles[index]?.size || 0
+          }))
+        ).then((files) => files.filter((file) => file.url || file.thumbnailDataUrl))
+      : [];
+
     setState((prev) => ({
       ...prev,
-      mentorMessages: [...prev.mentorMessages, { role: 'user', content: userMessage || 'Immagini allegate' }]
+      mentorMessages: [
+        ...prev.mentorMessages,
+        { role: 'user', content: userMessage || 'Immagini allegate', attachments: messageAttachments }
+      ]
     }));
-
-    setBusy((prev) => ({ ...prev, chat: true }));
 
     try {
       const images = hasImages ? await Promise.all(uploadedFiles.map(fileToBase64)) : [];
@@ -551,12 +835,14 @@ export default function App() {
             streak: state.streak,
             recurringErrors: state.recurringErrors,
             recentExercises: state.recentSessions,
+            progress: {
+              dailyMinutes: state.dailyMinutes,
+              totalHours: state.totalHours
+            },
+            recentMessages: buildRecentMentorContext(state.mentorMessages),
             currentExercise: state.currentExercise
               ? {
-                  type: state.currentExercise.type,
-                  title: state.currentExercise.title,
-                  category: state.currentExercise.category,
-                  objective: state.currentExercise.objective
+                  ...state.currentExercise
                 }
               : null,
             lastFeedback: state.feedback
@@ -574,7 +860,10 @@ export default function App() {
         throw new Error('Risposta vuota dal Mentor.');
       }
 
-      const reply = normalizeMentorReply(data);
+      const actionSummary = applyMentorActions([...(data.actions || []), ...buildLocalMentorActions(userMessage)]);
+      const reply = actionSummary
+        ? `${normalizeMentorReply(data)}\n\nModifica applicata: ${actionSummary}.`
+        : normalizeMentorReply(data);
 
       setState((prev) => ({
         ...prev,
@@ -584,7 +873,10 @@ export default function App() {
       setChatInput('');
 
       if (images.length) {
-        revokePreviewUrls(filePreviewsRef.current);
+        sentPreviewUrlsRef.current = [
+          ...sentPreviewUrlsRef.current,
+          ...messageAttachments.map((file) => file.url)
+        ];
         filePreviewsRef.current = [];
         setUploadedFiles([]);
         setFilePreviews([]);
@@ -634,6 +926,23 @@ export default function App() {
     }));
   }
 
+  function toggleBlockedApp(appName) {
+    setState((prev) => {
+      const current = Array.isArray(prev.focusMode.blockedApps) ? prev.focusMode.blockedApps : [];
+      const blockedApps = current.includes(appName)
+        ? current.filter((item) => item !== appName)
+        : [...current, appName];
+
+      return {
+        ...prev,
+        focusMode: {
+          ...prev.focusMode,
+          blockedApps
+        }
+      };
+    });
+  }
+
   const screenProps = {
     state,
     goal,
@@ -658,6 +967,7 @@ export default function App() {
     onRemoveFile: removeFile,
     onToggleFocus: toggleFocus,
     onResetFocus: resetFocus,
+    onToggleBlockedApp: toggleBlockedApp,
     secondsToClock,
     goTo: setScreen
   };
